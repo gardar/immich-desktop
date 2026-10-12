@@ -114,6 +114,38 @@ QString ThemeManager::buildStyleSheet() const
             background: %2;
         }
         QWidget#libraryToolbar { background: transparent; }
+        QFrame#searchOptionsCard {
+            background: %3;
+            border: 1px solid %4;
+            border-radius: 16px;
+        }
+        QLabel[searchCaption="true"] { color: %5; font-size: 9.5pt; font-weight: 600; }
+        QLabel#searchFilterSummary {
+            color: %5;
+            background: %6;
+            border-radius: 8px;
+            padding: 4px 8px;
+            font-size: 9pt;
+        }
+        QFrame#searchOptionsDivider { background: %4; border: none; }
+        QFrame#searchOptionsCard QComboBox, QFrame#searchOptionsCard QLineEdit,
+        QFrame#searchOptionsCard QDateEdit { min-width: 0; }
+        QPushButton#resetSearchFilters { padding: 6px 10px; font-size: 9pt; }
+        QPushButton#searchSettingsButton:checked { background: %7; border-color: %7; }
+        QToolButton#searchModeOption {
+            background: %6;
+            color: %1;
+            border: 1px solid %4;
+            border-radius: 10px;
+            padding: 9px 10px;
+            font-weight: 500;
+        }
+        QToolButton#searchModeOption:hover { border-color: %7; }
+        QToolButton#searchModeOption:checked {
+            background: %7;
+            color: white;
+            border-color: %7;
+        }
         QLabel#timelineDayHeader {
             color: %1;
             font-size: 11.25pt;

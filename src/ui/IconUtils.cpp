@@ -28,13 +28,14 @@ void refreshActionButton(QPushButton *button)
         button->setToolTip(label);
         button->setAccessibleName(label);
     }
+    button->ensurePolished();
+    button->style()->unpolish(button);
+    button->style()->polish(button);
     const auto color = button->property("primary").toBool() ? QColor(Qt::white)
         : button->palette().color(QPalette::ButtonText);
     button->setIcon(QIcon(renderSvgIcon(button->property("actionIcon").toString(), color,
         QSize(20, 20), button->devicePixelRatioF())));
     button->setIconSize(QSize(20, 20));
-    button->style()->unpolish(button);
-    button->style()->polish(button);
     button->updateGeometry();
 }
 } // namespace

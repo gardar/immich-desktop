@@ -14,6 +14,7 @@
 
 #include <QApplication>
 #include <QBuffer>
+#include <QButtonGroup>
 #include <QClipboard>
 #include <QCheckBox>
 #include <QComboBox>
@@ -31,6 +32,8 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFocusEvent>
+#include <QFrame>
+#include <QGraphicsOpacityEffect>
 #include <QHideEvent>
 #include <QHBoxLayout>
 #include <QGridLayout>
@@ -43,6 +46,8 @@
 #include <QMessageBox>
 #include <QMimeData>
 #include <QPointer>
+#include <QParallelAnimationGroup>
+#include <QPropertyAnimation>
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QScrollArea>
@@ -54,8 +59,10 @@
 #include <QStackedWidget>
 #include <QStandardPaths>
 #include <QTimer>
+#include <QToolButton>
 #include <QUrl>
 #include <QVBoxLayout>
+#include <QVariantAnimation>
 
 #include <algorithm>
 #include <utility>
@@ -270,16 +277,26 @@ LibraryPage::LibraryPage(ImmichClient *client, FolderSyncService *folderSync,
     root->addWidget(toolbar);
     m_searchPanel = new QWidget(this);
     m_searchPanel->setObjectName(QStringLiteral("searchOptionsPanel"));
-    auto *searchLayout = new QVBoxLayout(m_searchPanel);
-    searchLayout->setContentsMargins(16, 0, 16, 14);
-    searchLayout->setSpacing(10);
+    m_searchPanel->installEventFilter(this);
+    auto *panelLayout = new QVBoxLayout(m_searchPanel);
+    panelLayout->setContentsMargins(16, 0, 16, 12);
+    auto *searchCard = new QFrame(m_searchPanel);
+    searchCard->setObjectName(QStringLiteral("searchOptionsCard"));
+    auto *searchLayout = new QVBoxLayout(searchCard);
+    searchLayout->setContentsMargins(18, 16, 18, 16);
+    searchLayout->setSpacing(12);
+    panelLayout->addWidget(searchCard);
     auto *filterHeader = new QHBoxLayout;
-    auto *filterTitle = new QLabel(tr("Filter by"), m_searchPanel);
+    auto *filterTitle = new QLabel(tr("Refine your search"), searchCard);
     filterTitle->setProperty("section", true);
     filterHeader->addWidget(filterTitle);
+    m_searchFilterSummary = new QLabel(searchCard);
+    m_searchFilterSummary->setObjectName(QStringLiteral("searchFilterSummary"));
+    filterHeader->addWidget(m_searchFilterSummary);
     filterHeader->addStretch();
     auto *resetSearch = new QPushButton(tr("Reset filters"), m_searchPanel);
     configureActionButton(resetSearch, QStringLiteral(":/icons/refresh-cw.svg"));
+    resetSearch->setObjectName(QStringLiteral("resetSearchFilters"));
     filterHeader->addWidget(resetSearch);
     searchLayout->addLayout(filterHeader);
 
@@ -289,6 +306,7 @@ LibraryPage::LibraryPage(ImmichClient *client, FolderSyncService *folderSync,
     auto addFilter = [this, filters](const QString &label, QWidget *field, int column) {
         auto *caption = new QLabel(label, m_searchPanel);
         caption->setBuddy(field);
+        caption->setProperty("searchCaption", true);
         field->setAccessibleName(label);
         filters->addWidget(caption, 0, column);
         filters->addWidget(field, 1, column);
@@ -318,7 +336,7 @@ LibraryPage::LibraryPage(ImmichClient *client, FolderSyncService *folderSync,
     searchLayout->addLayout(filters);
 
     auto *dateRow = new QHBoxLayout;
-    m_searchDateEnabled = new QCheckBox(tr("Date"), m_searchPanel);
+    m_searchDateEnabled = new QCheckBox(tr("Date range"), m_searchPanel);
     m_searchDateEnabled->setObjectName(QStringLiteral("searchDateEnabled"));
     m_searchDateFrom = new QDateEdit(QDate::currentDate().addYears(-1), m_searchPanel);
     m_searchDateTo = new QDateEdit(QDate::currentDate(), m_searchPanel);
@@ -337,11 +355,14 @@ LibraryPage::LibraryPage(ImmichClient *client, FolderSyncService *folderSync,
     dateRow->addStretch();
     searchLayout->addLayout(dateRow);
 
-    auto *interpretation = new QLabel(tr("Choose how Immich interprets your search: "
-        "by visual content, file details, or embedded text."), m_searchPanel);
-    interpretation->setWordWrap(true);
-    interpretation->setProperty("subheading", true);
-    searchLayout->addWidget(interpretation);
+    auto *divider = new QFrame(searchCard);
+    divider->setObjectName(QStringLiteral("searchOptionsDivider"));
+    divider->setFixedHeight(1);
+    searchLayout->addWidget(divider);
+    auto *modeTitle = new QLabel(tr("Search by"), searchCard);
+    modeTitle->setProperty("searchCaption", true);
+    searchLayout->addWidget(modeTitle);
+
     m_searchMode = new QComboBox(m_searchPanel);
     m_searchMode->setObjectName(QStringLiteral("searchMode"));
     m_searchMode->addItem(tr("Context"), QString());
@@ -350,8 +371,71 @@ LibraryPage::LibraryPage(ImmichClient *client, FolderSyncService *folderSync,
     m_searchMode->addItem(tr("Full path or folder"), QStringLiteral("originalPath"));
     m_searchMode->addItem(tr("OCR"), QStringLiteral("ocr"));
     m_searchMode->setAccessibleName(tr("Search interpretation"));
-    searchLayout->addWidget(m_searchMode);
+    m_searchMode->hide(); // Keep one source of truth for query interpretation.
+    m_searchModeButtons = new QButtonGroup(this);
+    m_searchModeButtons->setExclusive(true);
+    auto *modeRow = new QHBoxLayout;
+    modeRow->setSpacing(8);
+    const QStringList modeIcons = {QStringLiteral("images"), QStringLiteral("save"),
+        QStringLiteral("layout-dashboard"), QStringLiteral("folder"), QStringLiteral("server")};
+    for (int index = 0; index < m_searchMode->count(); ++index) {
+        auto *button = new QToolButton(searchCard);
+        button->setObjectName(QStringLiteral("searchModeOption"));
+        button->setText(m_searchMode->itemText(index));
+        button->setAccessibleName(button->text());
+        button->setCursor(Qt::PointingHandCursor);
+        button->setCheckable(true);
+        button->setToolButtonStyle(Qt::ToolButtonTextOnly);
+        button->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        button->setProperty("modeIcon", QStringLiteral(":/icons/%1.svg").arg(modeIcons.at(index)));
+        m_searchModeButtons->addButton(button, index);
+        modeRow->addWidget(button, 1);
+    }
+    searchLayout->addLayout(modeRow);
+    m_searchModeDescription = new QLabel(searchCard);
+    m_searchModeDescription->setWordWrap(true);
+    m_searchModeDescription->setProperty("subheading", true);
+    searchLayout->addWidget(m_searchModeDescription);
+    m_searchModeAnimation = new QVariantAnimation(this);
+    m_searchModeAnimation->setDuration(140);
+    m_searchModeAnimation->setEasingCurve(QEasingCurve::OutCubic);
+    connect(m_searchModeAnimation, &QVariantAnimation::valueChanged, this, [this](const QVariant &value) {
+        m_searchModeDescription->setStyleSheet(QStringLiteral("color: %1;")
+            .arg(value.value<QColor>().name(QColor::HexArgb)));
+    });
+    connect(m_searchModeButtons, &QButtonGroup::idClicked, m_searchMode, &QComboBox::setCurrentIndex);
+    connect(m_searchMode, &QComboBox::currentIndexChanged, this, [this] {
+        updateSearchOptionsUi();
+        if (m_searchPanel->isVisible()) {
+            m_searchModeAnimation->stop();
+            const QColor color = m_searchModeDescription->palette().color(QPalette::WindowText);
+            QColor faded = color;
+            faded.setAlpha(110);
+            m_searchModeAnimation->setStartValue(faded);
+            m_searchModeAnimation->setEndValue(color);
+            m_searchModeAnimation->start();
+        }
+    });
+    m_searchPanelOpacity = new QGraphicsOpacityEffect(m_searchPanel);
+    m_searchPanelOpacity->setOpacity(0.0);
+    m_searchPanel->setGraphicsEffect(m_searchPanelOpacity);
+    m_searchPanelAnimation = new QParallelAnimationGroup(this);
+    m_searchPanelHeightAnimation = new QPropertyAnimation(m_searchPanel, "maximumHeight");
+    m_searchPanelFadeAnimation = new QPropertyAnimation(m_searchPanelOpacity, "opacity");
+    for (auto *animation : {m_searchPanelHeightAnimation, m_searchPanelFadeAnimation}) {
+        animation->setDuration(180);
+        animation->setEasingCurve(QEasingCurve::OutCubic);
+        m_searchPanelAnimation->addAnimation(animation);
+    }
+    connect(m_searchPanelAnimation, &QParallelAnimationGroup::finished, this, [this] {
+        if (m_searchSettingsButton->isChecked())
+            m_searchPanel->setMaximumHeight(QWIDGETSIZE_MAX);
+        else
+            m_searchPanel->hide();
+    });
+    m_searchPanel->setMaximumHeight(0);
     m_searchPanel->hide();
+    updateSearchOptionsUi();
     root->addWidget(m_searchPanel);
     root->addWidget(m_emptyState);
     root->addWidget(m_contentStack, 1);
@@ -370,12 +454,13 @@ LibraryPage::LibraryPage(ImmichClient *client, FolderSyncService *folderSync,
         QTimer::singleShot(0, this, &LibraryPage::updateSearchExpansion);
     });
     connect(m_searchSettingsButton, &QPushButton::toggled, this, [this](bool open) {
-        m_searchPanel->setVisible(open);
+        animateSearchPanel(open);
         updateSearchExpansion();
         if (open && m_searchPerson->count() == 1 && m_client->isOnline())
             m_client->loadExplore();
     });
     auto optionsChanged = [this] {
+        updateSearchOptionsUi();
         if (!m_resettingSearchOptions)
             m_searchDebounce->start();
     };
@@ -408,6 +493,7 @@ LibraryPage::LibraryPage(ImmichClient *client, FolderSyncService *folderSync,
             m_searchPerson->addItem(person.name.isEmpty() ? tr("Unnamed person") : person.name, person.id);
         const int index = m_searchPerson->findData(selected);
         m_searchPerson->setCurrentIndex(qMax(0, index));
+        updateSearchOptionsUi();
     });
     connect(m_searchField, &QLineEdit::returnPressed, this, [this] {
         m_searchDebounce->stop();
@@ -638,6 +724,61 @@ void LibraryPage::updateSearchExpansion()
     m_searchSettingsButton->setVisible(m_searchActivated && expanded);
     m_searchField->setMaximumWidth(expanded ? 520 : 360);
     m_searchToolbarLayout->setStretch(0, expanded ? 0 : 1);
+}
+
+void LibraryPage::animateSearchPanel(bool open)
+{
+    m_searchPanelAnimation->stop();
+    const int currentHeight = m_searchPanel->isVisible() ? m_searchPanel->height() : 0;
+    if (open) {
+        m_searchPanel->setEnabled(m_client->isConfigured());
+        m_searchPanel->show();
+        m_searchPanel->layout()->activate();
+    } else {
+        // Exclude collapsing controls from keyboard navigation.
+        m_searchSettingsButton->setFocus(Qt::OtherFocusReason);
+        m_searchPanel->setEnabled(false);
+    }
+    const int targetHeight = open ? m_searchPanel->sizeHint().height() : 0;
+    m_searchPanelHeightAnimation->setStartValue(currentHeight);
+    m_searchPanelHeightAnimation->setEndValue(targetHeight);
+    m_searchPanelFadeAnimation->setStartValue(m_searchPanelOpacity->opacity());
+    m_searchPanelFadeAnimation->setEndValue(open ? 1.0 : 0.0);
+    m_searchPanelAnimation->start();
+}
+
+void LibraryPage::updateSearchOptionsUi()
+{
+    if (!m_searchModeButtons)
+        return;
+    const QStringList descriptions = {
+        tr("Find scenes, objects, and ideas in the visual content of your photos."),
+        tr("Match the original name of a photo or video file."),
+        tr("Search the descriptions saved with your photos and videos."),
+        tr("Find media by its original full path or folder."),
+        tr("Find words detected inside images, such as signs, receipts, and screenshots.")};
+    const int mode = m_searchMode->currentIndex();
+    const auto appearance = AppSettings().loadAppearance();
+    const bool minimal = appearance.minimalistUi;
+    const auto colors = appearance.preset == ThemePreset::Light ? ThemePalette::light()
+        : (appearance.preset == ThemePreset::Custom ? appearance.customPalette : ThemePalette::dark());
+    for (auto *option : m_searchModeButtons->buttons()) {
+        auto *button = qobject_cast<QToolButton *>(option);
+        const int index = m_searchModeButtons->id(button);
+        button->setChecked(index == mode);
+        button->setToolTip(m_searchMode->itemText(index) + QStringLiteral(" — ") + descriptions.at(index));
+        button->setToolButtonStyle(minimal ? Qt::ToolButtonIconOnly : Qt::ToolButtonTextOnly);
+        button->setIcon(QIcon(renderSvgIcon(button->property("modeIcon").toString(),
+            index == mode ? QColor(Qt::white) : colors.text,
+            QSize(18, 18), devicePixelRatioF())));
+    }
+    m_searchModeDescription->setText(descriptions.at(mode));
+    m_searchModeDescription->setStyleSheet(QStringLiteral("color: %1;").arg(colors.mutedText.name()));
+    QJsonObject filters = searchOptions();
+    filters.remove(QStringLiteral("mode"));
+    filters.remove(QStringLiteral("takenBefore")); // A date range is one filter.
+    m_searchFilterSummary->setText(filters.isEmpty() ? tr("No filters")
+        : tr("%n active filter(s)", nullptr, filters.size()));
 }
 
 void LibraryPage::handleNewestAssetsPolled(const QList<ImmichAsset> &assets)
@@ -2183,6 +2324,9 @@ bool LibraryPage::handleDragEvent(QEvent *event)
 
 bool LibraryPage::eventFilter(QObject *watched, QEvent *event)
 {
+    if (watched == m_searchPanel &&
+        (event->type() == QEvent::PaletteChange || event->type() == QEvent::StyleChange))
+        QTimer::singleShot(0, this, &LibraryPage::updateSearchOptionsUi);
     if (watched == m_searchField && event->type() == QEvent::MouseButtonPress) {
         m_searchActivated = true;
         updateSearchExpansion();
