@@ -42,6 +42,14 @@ Sidebar::Sidebar(ThemeManager *themeManager, QWidget *parent)
     version->setAlignment(Qt::AlignCenter);
     version->setWordWrap(true);
     layout->addWidget(version);
+    auto refreshLayout = [this, version] {
+        const bool minimal = m_themeManager->minimalistUi();
+        setFixedWidth(minimal ? 76 : 224);
+        m_navigationLabel->setVisible(!minimal);
+        version->setVisible(!minimal);
+    };
+    connect(m_themeManager, &ThemeManager::appearanceChanged, this, refreshLayout);
+    refreshLayout();
 }
 
 void Sidebar::setCurrentPage(int index)

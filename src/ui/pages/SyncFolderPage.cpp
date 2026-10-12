@@ -34,6 +34,9 @@ SyncFolderPage::SyncFolderPage(FolderSyncService *syncService, ThemeManager *the
     , m_statusText(new QLabel(this))
 {
     auto *root = new QVBoxLayout(this);
+    configureActionButton(m_browseButton, QStringLiteral(":/icons/folder.svg"));
+    configureActionButton(m_openButton, QStringLiteral(":/icons/external-link.svg"));
+    configureActionButton(m_scanButton, QStringLiteral(":/icons/refresh-cw.svg"));
     root->setContentsMargins(0, 12, 0, 0);
     root->setSpacing(14);
 

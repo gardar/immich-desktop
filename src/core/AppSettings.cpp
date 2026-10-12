@@ -72,6 +72,10 @@ AppSettings::AppSettings()
 AppearanceSettings AppSettings::loadAppearance() const
 {
     AppearanceSettings result;
+    result.iconPack = m_settings.value(QStringLiteral("appearance/iconPack"), QStringLiteral("lucide")).toString();
+    if (result.iconPack != QStringLiteral("tabler") && result.iconPack != QStringLiteral("bootstrap"))
+        result.iconPack = QStringLiteral("lucide");
+    result.minimalistUi = m_settings.value(QStringLiteral("appearance/minimalistUi"), false).toBool();
     result.preset = themePresetFromKey(
         m_settings.value(QStringLiteral("appearance/theme"), QStringLiteral("dark")).toString());
 
@@ -90,6 +94,8 @@ AppearanceSettings AppSettings::loadAppearance() const
 
 void AppSettings::saveAppearance(const AppearanceSettings &appearance)
 {
+    m_settings.setValue(QStringLiteral("appearance/iconPack"), appearance.iconPack);
+    m_settings.setValue(QStringLiteral("appearance/minimalistUi"), appearance.minimalistUi);
     m_settings.setValue(QStringLiteral("appearance/theme"), themePresetKey(appearance.preset));
 
     m_settings.beginGroup(QStringLiteral("appearance/customPalette"));

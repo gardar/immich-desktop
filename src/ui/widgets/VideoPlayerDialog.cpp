@@ -1,4 +1,5 @@
 #include "ui/widgets/VideoPlayerDialog.h"
+#include "ui/IconUtils.h"
 
 #include "ui/widgets/SoftwareVideoWidget.h"
 #include "ui/widgets/ZoomPanWidget.h"
@@ -38,6 +39,9 @@ VideoPlayerDialog::VideoPlayerDialog(ImmichClient *client, const ImmichAsset &as
     setAttribute(Qt::WA_StyledBackground, true);
     setWindowTitle(asset.fileName.isEmpty() ? tr("Video") : asset.fileName);
     resize(1000, 700);
+    configureActionButton(m_downloadButton, QStringLiteral(":/icons/download.svg"));
+    configureActionButton(m_trashButton, QStringLiteral(":/icons/trash.svg"));
+    configureActionButton(m_deleteButton, QStringLiteral(":/icons/x.svg"));
 
     m_video->setMinimumSize(640, 360);
     m_player->setAudioOutput(m_audio);
@@ -172,9 +176,10 @@ void VideoPlayerDialog::togglePlayback()
 void VideoPlayerDialog::updatePlaybackButton()
 {
     const bool playing = m_player->playbackState() == QMediaPlayer::PlayingState;
-    m_playButton->setIcon(style()->standardIcon(
-        playing ? QStyle::SP_MediaPause : QStyle::SP_MediaPlay));
+    configureActionButton(m_playButton, playing ? QStringLiteral(":/icons/pause.svg")
+                                               : QStringLiteral(":/icons/play.svg"));
     m_playButton->setToolTip(playing ? tr("Pause") : tr("Play"));
+    m_playButton->setAccessibleName(playing ? tr("Pause") : tr("Play"));
 }
 
 void VideoPlayerDialog::updatePosition(qint64 position)

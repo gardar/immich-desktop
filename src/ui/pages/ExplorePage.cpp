@@ -1,6 +1,7 @@
 #include "ui/pages/ExplorePage.h"
 
 #include "core/AppSettings.h"
+#include "ui/IconUtils.h"
 #include "ui/widgets/MediaTile.h"
 #include "ui/widgets/VideoHoverPreview.h"
 #include "ui/widgets/VideoPlayerDialog.h"
@@ -165,6 +166,7 @@ ExplorePage::ExplorePage(ImmichClient *client, QWidget *parent)
     headingColumn->addWidget(m_browseStatus);
     toolbarLayout->addLayout(headingColumn, 1);
     m_refreshButton = new QPushButton(tr("Refresh"), toolbar);
+    configureActionButton(m_refreshButton, QStringLiteral(":/icons/refresh-cw.svg"));
     toolbarLayout->addWidget(m_refreshButton);
 
     m_browseScroll = new QScrollArea(m_browsePage);
@@ -229,6 +231,7 @@ ExplorePage::ExplorePage(ImmichClient *client, QWidget *parent)
     collectionToolbarLayout->setSpacing(14);
 
     m_collectionBack = new QPushButton(tr("← Explore"), collectionToolbar);
+    configureActionButton(m_collectionBack, QStringLiteral(":/icons/arrow-left.svg"));
     m_collectionBack->setCursor(Qt::PointingHandCursor);
 
     m_collectionHero = new QLabel(collectionToolbar);
@@ -269,6 +272,7 @@ ExplorePage::ExplorePage(ImmichClient *client, QWidget *parent)
         AppSettings().loadPlayback().hoverPreviewEnabled);
 
     m_collectionLoadMore = new QPushButton(tr("Load more"), m_collectionPage);
+    configureActionButton(m_collectionLoadMore, QStringLiteral(":/icons/chevron-down.svg"));
     m_collectionLoadMore->setVisible(false);
 
     m_collectionLayoutTimer = new QTimer(this);
@@ -297,6 +301,7 @@ ExplorePage::ExplorePage(ImmichClient *client, QWidget *parent)
     previewToolbarLayout->setContentsMargins(16, 12, 16, 10);
     previewToolbarLayout->setSpacing(12);
     m_previewBack = new QPushButton(tr("← Back"), previewToolbar);
+    configureActionButton(m_previewBack, QStringLiteral(":/icons/arrow-left.svg"));
     m_previewBack->setCursor(Qt::PointingHandCursor);
     m_previewTitle = new QLabel(previewToolbar);
     m_previewTitle->setProperty("heading", true);
@@ -917,7 +922,7 @@ void ExplorePage::updateCollectionLoadMore(const QString &nextPage)
     const bool hasMore = ok && page > 0;
     m_collectionLoadMore->setEnabled(hasMore);
     m_collectionLoadMore->setVisible(hasMore);
-    m_collectionLoadMore->setText(tr("Load more"));
+    setActionButtonLabel(m_collectionLoadMore, tr("Load more"));
 }
 
 void ExplorePage::requestCollectionNextPage()
@@ -930,7 +935,7 @@ void ExplorePage::requestCollectionNextPage()
 
     m_collectionLoadingMore = true;
     m_collectionLoadMore->setEnabled(false);
-    m_collectionLoadMore->setText(tr("Loading…"));
+    setActionButtonLabel(m_collectionLoadMore, tr("Loading…"));
 
     if (m_collectionFilterKind == QStringLiteral("person"))
         m_client->loadAssetsForPerson(m_collectionFilterValue, page);

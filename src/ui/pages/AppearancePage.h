@@ -30,6 +30,9 @@ private:
 
     ThemeManager *m_themeManager;
     QComboBox *m_themeCombo;
+    QComboBox *m_iconPackCombo = nullptr;
+    QCheckBox *m_minimalistUi = nullptr;
+    QLabel *m_iconPreview = nullptr;
     QCheckBox *m_closeToTray;
     QCheckBox *m_autoStart;
     QCheckBox *m_hoverPreview = nullptr;

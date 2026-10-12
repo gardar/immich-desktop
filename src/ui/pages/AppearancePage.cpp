@@ -4,6 +4,7 @@
 #include "core/AutoStart.h"
 #include "core/ThemeManager.h"
 #include "ui/pages/LibraryPage.h"
+#include "ui/IconUtils.h"
 #include "ui/widgets/ColorButton.h"
 #include "ui/widgets/VideoHoverPreview.h"
 
@@ -16,6 +17,7 @@
 #include <QLabel>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QPainter>
 #include <QScrollArea>
 #include <QShowEvent>
 #include <QSignalBlocker>
@@ -121,6 +123,33 @@ AppearancePage::AppearancePage(ThemeManager *themeManager, QWidget *parent)
     presetLayout->addWidget(m_themeCombo, 0, Qt::AlignLeft);
     contentRoot->addWidget(presetCard);
 
+    QVBoxLayout *iconsLayout = nullptr;
+    auto *iconsCard = sectionCard(tr("Icons and interface"),
+        tr("Choose an icon pack and simplify action buttons. Changes are applied immediately and saved automatically."),
+        content, &iconsLayout);
+    auto *packLabel = new QLabel(tr("Icon pack"), iconsCard);
+    m_iconPackCombo = new QComboBox(iconsCard);
+    m_iconPackCombo->setObjectName(QStringLiteral("iconPackCombo"));
+    m_iconPackCombo->setAccessibleName(tr("Icon pack"));
+    packLabel->setBuddy(m_iconPackCombo);
+    m_iconPackCombo->addItem(tr("Lucide (default)"), QStringLiteral("lucide"));
+    m_iconPackCombo->addItem(tr("Tabler"), QStringLiteral("tabler"));
+    m_iconPackCombo->addItem(tr("Bootstrap Icons"), QStringLiteral("bootstrap"));
+    iconsLayout->addWidget(packLabel);
+    iconsLayout->addWidget(m_iconPackCombo, 0, Qt::AlignLeft);
+    m_iconPreview = new QLabel(iconsCard);
+    m_iconPreview->setAccessibleName(tr("Preview: upload, library, settings"));
+    iconsLayout->addWidget(m_iconPreview);
+    m_minimalistUi = new QCheckBox(tr("Minimalist UI (icons instead of button labels)"), iconsCard);
+    m_minimalistUi->setObjectName(QStringLiteral("minimalistUiToggle"));
+    m_minimalistUi->setCursor(Qt::PointingHandCursor);
+    iconsLayout->addWidget(m_minimalistUi);
+    auto *minimalistHelp = new QLabel(tr("Navigation and action buttons use icons. Hover over an icon to see its action."), iconsCard);
+    minimalistHelp->setProperty("subheading", true);
+    minimalistHelp->setWordWrap(true);
+    iconsLayout->addWidget(minimalistHelp);
+    contentRoot->addWidget(iconsCard);
+
     QVBoxLayout *paletteLayout = nullptr;
     auto *paletteCard = sectionCard(
         QStringLiteral("Custom palette"),
@@ -141,6 +170,7 @@ AppearancePage::AppearancePage(ThemeManager *themeManager, QWidget *parent)
     paletteLayout->addLayout(colorGrid);
     auto *reset = new QPushButton(QStringLiteral("Reset custom colors"), paletteCard);
     reset->setCursor(Qt::PointingHandCursor);
+    configureActionButton(reset, QStringLiteral(":/icons/refresh-cw.svg"));
     paletteLayout->addWidget(reset, 0, Qt::AlignLeft);
     contentRoot->addWidget(paletteCard);
 
@@ -220,6 +250,7 @@ AppearancePage::AppearancePage(ThemeManager *themeManager, QWidget *parent)
     m_cacheSizeLabel->setWordWrap(true);
     auto *refreshCache = new QPushButton(tr("Refresh"), cacheCard);
     refreshCache->setCursor(Qt::PointingHandCursor);
+    configureActionButton(refreshCache, QStringLiteral(":/icons/refresh-cw.svg"));
     cacheLayout->addWidget(m_cacheSizeLabel);
     cacheLayout->addWidget(refreshCache, 0, Qt::AlignLeft);
     contentRoot->addWidget(cacheCard);
@@ -233,6 +264,10 @@ AppearancePage::AppearancePage(ThemeManager *themeManager, QWidget *parent)
         m_themeManager->setPreset(
             static_cast<ThemePreset>(m_themeCombo->itemData(index).toInt()));
     });
+    connect(m_iconPackCombo, &QComboBox::currentIndexChanged, this, [this](int index) {
+        m_themeManager->setIconPack(m_iconPackCombo->itemData(index).toString());
+    });
+    connect(m_minimalistUi, &QCheckBox::toggled, m_themeManager, &ThemeManager::setMinimalistUi);
     connect(reset, &QPushButton::clicked,
             m_themeManager, &ThemeManager::resetCustomPalette);
     connect(m_closeToTray, &QCheckBox::toggled, this, &AppearancePage::saveCloseToTray);
@@ -306,6 +341,23 @@ void AppearancePage::syncControls()
     const QSignalBlocker comboBlocker(m_themeCombo);
     const int index = m_themeCombo->findData(static_cast<int>(m_themeManager->preset()));
     m_themeCombo->setCurrentIndex(index);
+    const QSignalBlocker iconsBlocker(m_iconPackCombo);
+    const QSignalBlocker minimalBlocker(m_minimalistUi);
+    m_iconPackCombo->setCurrentIndex(m_iconPackCombo->findData(m_themeManager->iconPack()));
+    m_minimalistUi->setChecked(m_themeManager->minimalistUi());
+    const qreal scale = devicePixelRatioF();
+    QPixmap preview(QSize(120, 28) * scale);
+    preview.setDevicePixelRatio(scale);
+    preview.fill(Qt::transparent);
+    QPainter painter(&preview);
+    int x = 0;
+    for (const auto &name : {QStringLiteral("upload"), QStringLiteral("images"), QStringLiteral("settings")}) {
+        painter.drawPixmap(x, 2, renderSvgIcon(QStringLiteral(":/icons/%1.svg").arg(name),
+            m_themeManager->palette().text, QSize(24, 24), scale));
+        x += 40;
+    }
+    painter.end();
+    m_iconPreview->setPixmap(preview);
 
     const WindowSettings window = AppSettings().loadWindow();
     const QSignalBlocker trayBlocker(m_closeToTray);

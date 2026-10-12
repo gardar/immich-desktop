@@ -50,6 +50,7 @@ TopBar::TopBar(ThemeManager *themeManager, QWidget *parent)
     m_updateButton->setFixedHeight(36);
     m_updateButton->setIconSize(QSize(18, 18));
     m_updateButton->setVisible(false);
+    configureActionButton(m_updateButton, QStringLiteral(":/icons/download.svg"));
     layout->addWidget(m_updateButton);
 
     auto prepareControl = [layout](QPushButton *button, const QString &name) {
@@ -82,7 +83,7 @@ void TopBar::setUpdateAvailable(bool available, const QString &version)
 {
     m_updateButton->setVisible(available);
     if (available) {
-        m_updateButton->setText(version.isEmpty()
+        setActionButtonLabel(m_updateButton, version.isEmpty()
                                     ? tr("  Update available")
                                     : tr("  Update to v%1").arg(version));
         m_updateButton->setToolTip(tr("Open the Updates page"));

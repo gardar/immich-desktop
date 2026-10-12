@@ -166,6 +166,10 @@ LibraryPage::LibraryPage(ImmichClient *client, FolderSyncService *folderSync,
     toolbarLayout->addWidget(m_uploadButton);
     toolbarLayout->addWidget(m_refreshButton);
     toolbarLayout->addWidget(m_yearsButton);
+    configureActionButton(m_uploadButton, QStringLiteral(":/icons/upload.svg"));
+    configureActionButton(m_refreshButton, QStringLiteral(":/icons/refresh-cw.svg"));
+    configureActionButton(m_yearsButton, QStringLiteral(":/icons/calendar.svg"));
+    configureActionButton(m_searchSettingsButton, QStringLiteral(":/icons/settings.svg"));
 
     m_timelineHost->setObjectName(QStringLiteral("timelineHost"));
     m_timelineHost->setAcceptDrops(true);
@@ -222,6 +226,7 @@ LibraryPage::LibraryPage(ImmichClient *client, FolderSyncService *folderSync,
     auto *yearHeaderLayout = new QHBoxLayout(yearHeaderBar);
     yearHeaderLayout->setContentsMargins(16, 12, 16, 10);
     auto *backToLibraryButton = new QPushButton(tr("← Library"), yearHeaderBar);
+    configureActionButton(backToLibraryButton, QStringLiteral(":/icons/arrow-left.svg"));
     backToLibraryButton->setCursor(Qt::PointingHandCursor);
     auto *yearHeading = new QLabel(tr("Years"), yearHeaderBar);
     yearHeading->setProperty("heading", true);
@@ -253,6 +258,7 @@ LibraryPage::LibraryPage(ImmichClient *client, FolderSyncService *folderSync,
     auto *yearDetailHeaderLayout = new QHBoxLayout(yearDetailHeaderBar);
     yearDetailHeaderLayout->setContentsMargins(16, 12, 16, 10);
     auto *backToYearGridButton = new QPushButton(tr("← Years"), yearDetailHeaderBar);
+    configureActionButton(backToYearGridButton, QStringLiteral(":/icons/arrow-left.svg"));
     backToYearGridButton->setCursor(Qt::PointingHandCursor);
     m_yearDetailStatus->setProperty("heading", true);
     yearDetailHeaderLayout->addWidget(backToYearGridButton);
@@ -273,6 +279,7 @@ LibraryPage::LibraryPage(ImmichClient *client, FolderSyncService *folderSync,
     filterHeader->addWidget(filterTitle);
     filterHeader->addStretch();
     auto *resetSearch = new QPushButton(tr("Reset filters"), m_searchPanel);
+    configureActionButton(resetSearch, QStringLiteral(":/icons/refresh-cw.svg"));
     filterHeader->addWidget(resetSearch);
     searchLayout->addLayout(filterHeader);
 

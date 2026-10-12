@@ -11,6 +11,8 @@ namespace Aurora {
 struct AppearanceSettings {
     ThemePreset preset = ThemePreset::Dark;
     ThemePalette customPalette = ThemePalette::customDefault();
+    QString iconPack = QStringLiteral("lucide");
+    bool minimalistUi = false;
 };
 
 struct UpdateSettings {

@@ -20,6 +20,8 @@ AnimatedButton::AnimatedButton(const QString &text, const QString &iconResource,
     setCursor(Qt::PointingHandCursor);
     setMinimumHeight(44);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    setToolTip(text);
+    setAccessibleName(text);
     setStyleSheet(QStringLiteral("background: transparent; border: none; padding: 0;"));
     connect(m_themeManager, &ThemeManager::appearanceChanged, this,
             [this] { update(); });
@@ -74,9 +76,10 @@ void AnimatedButton::paintEvent(QPaintEvent *)
     const QColor iconColor = isChecked() ? QColor(Qt::white) : theme.mutedText;
     const QPixmap icon = renderSvgIcon(m_iconResource, iconColor, QSize(19, 19),
                                        devicePixelRatioF());
-    painter.drawPixmap(QRect(15, (height() - 19) / 2, 19, 19), icon);
-    painter.drawText(rect().adjusted(46, 0, -10, 0),
-                     Qt::AlignVCenter | Qt::AlignLeft, text());
+    const bool minimal = m_themeManager->minimalistUi();
+    painter.drawPixmap(QRect(minimal ? (width() - 19) / 2 : 15, (height() - 19) / 2, 19, 19), icon);
+    if (!minimal)
+        painter.drawText(rect().adjusted(46, 0, -10, 0), Qt::AlignVCenter | Qt::AlignLeft, text());
 }
 
 void AnimatedButton::animateTo(qreal endValue)

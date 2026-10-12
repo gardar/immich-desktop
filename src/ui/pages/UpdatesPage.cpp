@@ -1,4 +1,5 @@
 #include "ui/pages/UpdatesPage.h"
+#include "ui/IconUtils.h"
 
 #include "AppVersion.h"
 #include "core/AppSettings.h"
@@ -32,6 +33,8 @@ UpdatesPage::UpdatesPage(UpdateManager *updateManager, QWidget *parent)
     , m_starCard(new QFrame(this))
 {
     auto *root = new QVBoxLayout(this);
+    configureActionButton(m_refreshButton, QStringLiteral(":/icons/refresh-cw.svg"));
+    configureActionButton(m_updateButton, QStringLiteral(":/icons/download.svg"));
     root->setContentsMargins(24, 24, 24, 24);
     root->setSpacing(16);
 
@@ -104,9 +107,11 @@ UpdatesPage::UpdatesPage(UpdateManager *updateManager, QWidget *parent)
     auto *starButtons = new QHBoxLayout;
     starButtons->setSpacing(10);
     auto *starButton = new QPushButton(tr("Star on GitHub"), m_starCard);
+    configureActionButton(starButton, QStringLiteral(":/icons/star.svg"));
     starButton->setCursor(Qt::PointingHandCursor);
     starButton->setProperty("primary", true);
     auto *laterButton = new QPushButton(tr("Maybe later"), m_starCard);
+    configureActionButton(laterButton, QStringLiteral(":/icons/x.svg"));
     laterButton->setCursor(Qt::PointingHandCursor);
     starButtons->addWidget(starButton);
     starButtons->addWidget(laterButton);

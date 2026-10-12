@@ -22,9 +22,13 @@ public:
     ThemePreset preset() const;
     const ThemePalette &palette() const;
     const ThemePalette &customPalette() const;
+    QString iconPack() const { return m_settings.iconPack; }
+    bool minimalistUi() const { return m_settings.minimalistUi; }
 
     void initialize();
     void setPreset(ThemePreset preset);
+    void setIconPack(const QString &pack);
+    void setMinimalistUi(bool enabled);
     void setCustomColor(ColorRole role, const QColor &color);
     void resetCustomPalette();
 

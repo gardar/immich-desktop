@@ -68,6 +68,8 @@
           <li>Filter by scope, people, date, city, and media type</li>
           <li>Search visual context, file name, description, full path, or OCR text</li>
           <li>Support filter-only searches, filter reset, and outdated response protection</li>
+          <li>Choose Lucide, Tabler, or Bootstrap Icons in Appearance settings</li>
+          <li>Use a minimalist interface with icon buttons and a compact sidebar</li>
         </ul>
       </description>
       <url>https://github.com/hdmain/immich-desktop/releases/tag/v0.2.1</url>

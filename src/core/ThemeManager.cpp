@@ -1,4 +1,5 @@
 #include "core/ThemeManager.h"
+#include "ui/IconUtils.h"
 
 #include <QApplication>
 
@@ -24,6 +25,23 @@ void ThemeManager::setPreset(ThemePreset preset)
     if (m_settings.preset == preset)
         return;
     m_settings.preset = preset;
+    refresh();
+}
+
+void ThemeManager::setIconPack(const QString &pack)
+{
+    if ((pack != QStringLiteral("lucide") && pack != QStringLiteral("tabler")
+         && pack != QStringLiteral("bootstrap")) || pack == m_settings.iconPack)
+        return;
+    m_settings.iconPack = pack;
+    refresh();
+}
+
+void ThemeManager::setMinimalistUi(bool enabled)
+{
+    if (m_settings.minimalistUi == enabled)
+        return;
+    m_settings.minimalistUi = enabled;
     refresh();
 }
 
@@ -59,6 +77,7 @@ void ThemeManager::refresh(bool persist)
 
     if (qApp)
         qApp->setStyleSheet(buildStyleSheet());
+    setIconAppearance(m_settings.iconPack, m_settings.minimalistUi);
     if (persist)
         m_store.saveAppearance(m_settings);
     emit appearanceChanged();
@@ -113,6 +132,7 @@ QString ThemeManager::buildStyleSheet() const
             font-weight: 600;
         }
         QPushButton:hover { border-color: %7; }
+        QPushButton[iconOnly="true"] { padding: 9px; min-width: 20px; }
         QPushButton:pressed { background: %7; color: white; }
         QPushButton[primary="true"] { background: %7; color: white; border-color: %7; }
         QPushButton[windowControl="true"] {

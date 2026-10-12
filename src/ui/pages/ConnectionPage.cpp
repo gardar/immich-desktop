@@ -1,4 +1,5 @@
 #include "ui/pages/ConnectionPage.h"
+#include "ui/IconUtils.h"
 
 #include "core/ImmichClient.h"
 
@@ -22,6 +23,7 @@ ConnectionPage::ConnectionPage(ImmichClient *client, QWidget *parent)
     , m_status(new QLabel(this))
     , m_saveButton(new QPushButton(tr("Save & test connection"), this))
 {
+    configureActionButton(m_saveButton, QStringLiteral(":/icons/save.svg"));
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(0, 12, 0, 0);
     root->setSpacing(14);

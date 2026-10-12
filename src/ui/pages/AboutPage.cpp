@@ -1,4 +1,5 @@
 #include "ui/pages/AboutPage.h"
+#include "ui/IconUtils.h"
 
 #include "AppVersion.h"
 
@@ -184,6 +185,7 @@ AboutPage::AboutPage(QWidget *parent)
         l->addWidget(discordRow);
 
         auto *copyBtn = new QPushButton(tr("Copy Discord handle"), c);
+        configureActionButton(copyBtn, QStringLiteral(":/icons/copy.svg"));
         copyBtn->setCursor(Qt::PointingHandCursor);
         QObject::connect(copyBtn, &QPushButton::clicked, copyBtn, [copyBtn] {
             QGuiApplication::clipboard()->setText(QStringLiteral("diegosanche3"));
@@ -193,6 +195,7 @@ AboutPage::AboutPage(QWidget *parent)
         });
 
         auto *ghBtn = new QPushButton(tr("Open GitHub"), c);
+        configureActionButton(ghBtn, QStringLiteral(":/icons/external-link.svg"));
         ghBtn->setCursor(Qt::PointingHandCursor);
         ghBtn->setProperty("primary", true);
         QObject::connect(ghBtn, &QPushButton::clicked, c, [] {
