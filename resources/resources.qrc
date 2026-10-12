@@ -115,6 +115,7 @@
     <qresource prefix="/">
         <file alias="icons/pause.svg">icons/pause.svg</file>
         <file alias="ui/chevron-down-dark.svg">ui/chevron-down-dark.svg</file>
+        <file alias="ui/plus.svg">ui/plus.svg</file>
         <file alias="ui/chevron-down-light.svg">ui/chevron-down-light.svg</file>
         <file alias="icons/tabler/pause.svg">icons/tabler/pause.svg</file>
         <file alias="icons/bootstrap/pause.svg">icons/bootstrap/pause.svg</file>

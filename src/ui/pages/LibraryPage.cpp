@@ -1899,7 +1899,7 @@ void LibraryPage::downloadAsset(const ImmichAsset &asset)
         QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
     const QString path = QFileDialog::getSaveFileName(
         this, tr("Download media"), QStringLiteral("%1/%2").arg(downloads, suggestedName),
-        mediaFileFilter(), nullptr, QFileDialog::DontUseNativeDialog);
+        mediaFileFilter());
     if (path.isEmpty())
         return;
 
@@ -2143,7 +2143,7 @@ void LibraryPage::chooseFilesToUpload()
     const QStringList paths = QFileDialog::getOpenFileNames(
         this, tr("Upload media"),
         QStandardPaths::writableLocation(QStandardPaths::PicturesLocation),
-        mediaFileFilter(), nullptr, QFileDialog::DontUseNativeDialog);
+        mediaFileFilter());
     enqueueUploads(paths);
 }
 

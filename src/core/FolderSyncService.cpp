@@ -11,11 +11,14 @@
 #include <QFileSystemWatcher>
 #include <QImageReader>
 #include <QJsonDocument>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QStandardPaths>
+#include <QSaveFile>
 #include <QTimer>
 
 #include <algorithm>
+#include <iterator>
 
 namespace Aurora {
 namespace {
@@ -83,20 +86,33 @@ FolderSyncSettings FolderSyncService::settings() const
 void FolderSyncService::setSettings(const FolderSyncSettings &settings)
 {
     FolderSyncSettings normalized = settings;
-    normalized.folderPath = QDir::cleanPath(normalized.folderPath.trimmed());
-    if (!normalized.folderPath.isEmpty())
-        normalized.folderPath = QFileInfo(normalized.folderPath).absoluteFilePath();
+    normalized.folderPaths.clear();
+    for (const auto &folder : settings.folderPaths) {
+        if (folder.trimmed().isEmpty())
+            continue;
+        const QFileInfo info(QDir::cleanPath(folder.trimmed()));
+        const QString path = info.canonicalFilePath().isEmpty() ? info.absoluteFilePath() : info.canonicalFilePath();
+#ifdef Q_OS_WIN
+        const bool duplicate = normalized.folderPaths.contains(path, Qt::CaseInsensitive);
+#else
+        const bool duplicate = normalized.folderPaths.contains(path);
+#endif
+        if (!duplicate)
+            normalized.folderPaths.append(path);
+    }
 
     const bool changed = normalized.enabled != m_settings.enabled ||
                          normalized.localNetworkOnly != m_settings.localNetworkOnly ||
-                         normalized.folderPath != m_settings.folderPath;
+                         normalized.folderPaths != m_settings.folderPaths;
     m_settings = normalized;
     m_store.saveFolderSync(m_settings);
     if (changed) {
-        m_pending.clear();
-        m_queued.clear();
-        m_errors.clear();
-        loadSyncedState();
+        for (auto it = m_pending.begin(); it != m_pending.end();)
+            it = isUnderSyncFolder(it.key()) ? std::next(it) : m_pending.erase(it);
+        for (auto it = m_queued.begin(); it != m_queued.end();)
+            it = isUnderSyncFolder(*it) ? std::next(it) : m_queued.erase(it);
+        for (auto it = m_errors.begin(); it != m_errors.end();)
+            it = isUnderSyncFolder(it.key()) ? std::next(it) : m_errors.erase(it);
         rebuildWatcher();
         emit settingsChanged(m_settings);
         refreshStatus();
@@ -143,7 +159,7 @@ QList<ImmichAsset> FolderSyncService::pendingLibraryAssets() const
 
 void FolderSyncService::scanNow()
 {
-    if (!m_settings.enabled || m_settings.folderPath.isEmpty()) {
+    if (!m_settings.enabled || m_settings.folderPaths.isEmpty()) {
         refreshStatus();
         publishLibraryPending();
         return;
@@ -182,7 +198,10 @@ void FolderSyncService::scanNow()
 
 void FolderSyncService::handleDirectoryChanged(const QString &)
 {
-    QTimer::singleShot(300, this, &FolderSyncService::scanNow);
+    QTimer::singleShot(300, this, [this] {
+        rebuildWatcher();
+        scanNow();
+    });
 }
 
 void FolderSyncService::handleUploadProgress(const QString &filePath, qint64, qint64)
@@ -291,6 +310,7 @@ void FolderSyncService::processStableFiles()
 
 void FolderSyncService::periodicScan()
 {
+    rebuildWatcher();
     scanNow();
 }
 
@@ -361,18 +381,19 @@ ImmichAsset FolderSyncService::assetFromLocalFile(const QString &path)
 
 bool FolderSyncService::isUnderSyncFolder(const QString &path) const
 {
-    if (m_settings.folderPath.isEmpty())
-        return false;
-    const QString absolute = QFileInfo(path).absoluteFilePath();
-    const QString root = QFileInfo(m_settings.folderPath).absoluteFilePath();
-    if (absolute.compare(root, Qt::CaseInsensitive) == 0)
-        return false;
+    const QString absolute = QDir::fromNativeSeparators(QFileInfo(path).absoluteFilePath());
+    for (const QString &folder : m_settings.folderPaths) {
+        QString prefix = QDir::fromNativeSeparators(QFileInfo(folder).absoluteFilePath());
+        if (!prefix.endsWith(u'/'))
+            prefix += u'/';
 #ifdef Q_OS_WIN
-    return absolute.startsWith(root + u'/', Qt::CaseInsensitive) ||
-           absolute.startsWith(root + u'\\', Qt::CaseInsensitive);
+        if (absolute.startsWith(prefix, Qt::CaseInsensitive))
 #else
-    return absolute.startsWith(root + u'/');
+        if (absolute.startsWith(prefix))
 #endif
+            return true;
+    }
+    return false;
 }
 
 bool FolderSyncService::alreadySynced(const QString &path) const
@@ -410,9 +431,8 @@ void FolderSyncService::loadSyncedState()
     if (!file.open(QIODevice::ReadOnly))
         return;
     const QJsonObject root = QJsonDocument::fromJson(file.readAll()).object();
-    const QString folder = root.value(QStringLiteral("folder")).toString();
-    if (folder != m_settings.folderPath)
-        return;
+    // Fingerprints are keyed by absolute file path. Keep them when adding,
+    // removing, or reordering roots, including the legacy single-folder state.
     const QJsonObject files = root.value(QStringLiteral("files")).toObject();
     for (auto it = files.begin(); it != files.end(); ++it)
         m_syncedFingerprints.insert(it.key(), it.value().toString());
@@ -425,15 +445,16 @@ void FolderSyncService::saveSyncedState() const
         files.insert(it.key(), it.value());
 
     QJsonObject root;
-    root.insert(QStringLiteral("folder"), m_settings.folderPath);
+    root.insert(QStringLiteral("folders"), QJsonArray::fromStringList(m_settings.folderPaths));
     root.insert(QStringLiteral("files"), files);
 
     const QString path = stateFilePath();
     QDir().mkpath(QFileInfo(path).absolutePath());
-    QFile file(path);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate))
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly))
         return;
     file.write(QJsonDocument(root).toJson(QJsonDocument::Compact));
+    file.commit();
 }
 
 void FolderSyncService::rebuildWatcher()
@@ -446,19 +467,19 @@ void FolderSyncService::rebuildWatcher()
         m_watcher->removePaths(files);
 
     m_scanTimer->stop();
-    if (!m_settings.enabled || m_settings.folderPath.isEmpty())
+    if (!m_settings.enabled || m_settings.folderPaths.isEmpty())
         return;
-
-    QDir dir(m_settings.folderPath);
-    if (!dir.exists())
-        return;
-
-    m_watcher->addPath(dir.absolutePath());
-    const QFileInfoList subdirs =
-        dir.entryInfoList(QDir::Dirs | QDir::NoDotAndDotDot);
-    for (const QFileInfo &sub : subdirs)
-        m_watcher->addPath(sub.absoluteFilePath());
-
+    QSet<QString> watched;
+    for (const QString &folder : m_settings.folderPaths) {
+        if (!QDir(folder).exists())
+            continue;
+        watched.insert(folder);
+        QDirIterator it(folder, QDir::Dirs | QDir::NoDotAndDotDot, QDirIterator::Subdirectories);
+        while (it.hasNext())
+            watched.insert(it.next());
+    }
+    if (!watched.isEmpty())
+        m_watcher->addPaths(watched.values());
     m_scanTimer->start();
 }
 
@@ -488,15 +509,17 @@ void FolderSyncService::refreshStatus()
                   tr("Folder sync is turned off."));
         return;
     }
-    if (m_settings.folderPath.isEmpty()) {
+    if (m_settings.folderPaths.isEmpty()) {
         setStatus(FolderSyncUiStatus::Unsaved,
                   tr("Choose a folder to watch for photos and videos."));
         return;
     }
-    if (!QDir(m_settings.folderPath).exists()) {
-        setStatus(FolderSyncUiStatus::Error,
-                  tr("Sync folder does not exist: %1").arg(m_settings.folderPath));
-        return;
+    for (const auto &folder : m_settings.folderPaths) {
+        if (!QDir(folder).exists()) {
+            setStatus(FolderSyncUiStatus::Error,
+                      tr("Sync folder does not exist: %1").arg(folder));
+            return;
+        }
     }
     if (!m_client->isConfigured()) {
         setStatus(FolderSyncUiStatus::Unsaved,
@@ -535,9 +558,13 @@ void FolderSyncService::refreshStatus()
         return;
     }
 
+    int syncedCount = 0;
+    for (auto it = m_syncedFingerprints.cbegin(); it != m_syncedFingerprints.cend(); ++it)
+        if (isUnderSyncFolder(it.key()))
+            ++syncedCount;
     setStatus(FolderSyncUiStatus::Saved,
               tr("Up to date with Immich (%n synced file(s)).", nullptr,
-                 m_syncedFingerprints.size()));
+                 syncedCount));
 }
 
 void FolderSyncService::setStatus(FolderSyncUiStatus status, const QString &message)
@@ -552,7 +579,7 @@ void FolderSyncService::setStatus(FolderSyncUiStatus status, const QString &mess
 void FolderSyncService::publishLibraryPending()
 {
     QList<ImmichAsset> pending;
-    if (m_settings.enabled && !m_settings.folderPath.isEmpty()) {
+    if (m_settings.enabled && !m_settings.folderPaths.isEmpty()) {
         const QStringList files = collectMediaFiles();
         pending.reserve(files.size());
         for (const QString &path : files) {
@@ -595,15 +622,23 @@ void FolderSyncService::publishLibraryPending()
 QStringList FolderSyncService::collectMediaFiles() const
 {
     QStringList result;
-    if (m_settings.folderPath.isEmpty())
-        return result;
-    QDirIterator it(m_settings.folderPath,
+    QSet<QString> seen;
+    for (const auto &folder : m_settings.folderPaths) {
+        QDirIterator it(folder,
                     QDir::Files | QDir::Readable | QDir::NoDotAndDotDot,
                     QDirIterator::Subdirectories);
-    while (it.hasNext()) {
-        const QString path = it.next();
-        if (isMediaFile(path))
-            result.append(QFileInfo(path).absoluteFilePath());
+        while (it.hasNext()) {
+            const QString path = QFileInfo(it.next()).absoluteFilePath();
+#ifdef Q_OS_WIN
+            const QString key = path.toCaseFolded();
+#else
+            const QString key = path;
+#endif
+            if (isMediaFile(path) && !seen.contains(key)) {
+                seen.insert(key);
+                result.append(path);
+            }
+        }
     }
     return result;
 }

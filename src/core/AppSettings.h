@@ -5,6 +5,7 @@
 #include <QDateTime>
 #include <QSettings>
 #include <QString>
+#include <QStringList>
 
 namespace Aurora {
 
@@ -50,7 +51,7 @@ struct TimelineSettings {
 struct FolderSyncSettings {
     bool enabled = false;
     bool localNetworkOnly = false;
-    QString folderPath;
+    QStringList folderPaths;
 };
 
 struct SupportSettings {

@@ -12,6 +12,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QSignalBlocker>
 #include <QUrl>
 #include <QVBoxLayout>
@@ -23,22 +24,28 @@ SyncFolderPage::SyncFolderPage(FolderSyncService *syncService, ThemeManager *the
     : QWidget(parent)
     , m_syncService(syncService)
     , m_themeManager(themeManager)
-    , m_enabled(new QCheckBox(tr("Watch a local folder and upload new media"), this))
+    , m_enabled(new QCheckBox(tr("Watch folders and upload new media"), this))
     , m_localNetworkOnly(new QCheckBox(
           tr("Upload only when Immich is available on the local network"), this))
-    , m_folderPath(new QLineEdit(this))
-    , m_browseButton(new QPushButton(tr("Browse…"), this))
-    , m_openButton(new QPushButton(tr("Open folder"), this))
+    , m_addFolderButton(new QPushButton(this))
     , m_scanButton(new QPushButton(tr("Scan now"), this))
     , m_statusIcon(new QLabel(this))
     , m_statusText(new QLabel(this))
 {
     auto *root = new QVBoxLayout(this);
-    configureActionButton(m_browseButton, QStringLiteral(":/icons/folder.svg"));
-    configureActionButton(m_openButton, QStringLiteral(":/icons/external-link.svg"));
+    configureActionButton(m_addFolderButton, QStringLiteral(":/ui/plus.svg"));
+    m_addFolderButton->setObjectName(QStringLiteral("addSyncFolderButton"));
+    m_addFolderButton->setToolTip(tr("Add another folder"));
+    m_addFolderButton->setAccessibleName(tr("Add another folder"));
+    m_addFolderButton->setCursor(Qt::PointingHandCursor);
     configureActionButton(m_scanButton, QStringLiteral(":/icons/refresh-cw.svg"));
     root->setContentsMargins(0, 12, 0, 0);
     root->setSpacing(14);
+    auto *scroll = new QScrollArea(this);
+    scroll->setWidgetResizable(true);
+    auto *content = new QWidget(scroll);
+    auto *contentLayout = new QVBoxLayout(content);
+    contentLayout->setContentsMargins(0, 0, 8, 0);
 
     auto *card = new QFrame(this);
     card->setProperty("card", true);
@@ -49,7 +56,7 @@ SyncFolderPage::SyncFolderPage(FolderSyncService *syncService, ThemeManager *the
     auto *title = new QLabel(tr("Folder sync"), card);
     title->setProperty("section", true);
     auto *description = new QLabel(
-        tr("Pick a folder on this computer. Photos and videos dropped into it "
+        tr("Choose folders on this computer. Photos and videos dropped into them "
            "(including subfolders) are uploaded to Immich automatically on Windows, "
            "macOS, and Linux. Files stay on disk after upload."),
         card);
@@ -64,18 +71,18 @@ SyncFolderPage::SyncFolderPage(FolderSyncService *syncService, ThemeManager *the
     m_localNetworkOnly->setToolTip(
         tr("Uses your Local URL from Immich Server settings. Files still appear in "
            "Library with an unsaved badge until the local server is reachable."));
-    m_folderPath->setText(current.folderPath);
-    m_folderPath->setPlaceholderText(tr("Choose a folder to sync…"));
-    m_folderPath->setClearButtonEnabled(true);
-
-    auto *pathRow = new QHBoxLayout;
-    pathRow->setSpacing(8);
-    pathRow->addWidget(m_folderPath, 1);
-    pathRow->addWidget(m_browseButton);
+    auto *foldersHeader = new QHBoxLayout;
+    auto *foldersLabel = new QLabel(tr("Folders"), card);
+    foldersLabel->setProperty("section", true);
+    foldersHeader->addWidget(foldersLabel);
+    foldersHeader->addStretch();
+    foldersHeader->addWidget(m_addFolderButton);
+    m_foldersLayout = new QVBoxLayout;
+    m_foldersLayout->setSpacing(8);
+    loadFolderRows(current.folderPaths);
 
     auto *actions = new QHBoxLayout;
     actions->setSpacing(8);
-    actions->addWidget(m_openButton);
     actions->addWidget(m_scanButton);
     actions->addStretch();
 
@@ -118,19 +125,20 @@ SyncFolderPage::SyncFolderPage(FolderSyncService *syncService, ThemeManager *the
     cardLayout->addWidget(description);
     cardLayout->addWidget(m_enabled);
     cardLayout->addWidget(m_localNetworkOnly);
-    cardLayout->addLayout(pathRow);
+    cardLayout->addLayout(foldersHeader);
+    cardLayout->addLayout(m_foldersLayout);
     cardLayout->addLayout(actions);
     cardLayout->addLayout(statusRow);
     cardLayout->addWidget(legend);
     cardLayout->addLayout(legendIcons);
-    root->addWidget(card);
-    root->addStretch();
+    contentLayout->addWidget(card);
+    contentLayout->addStretch();
+    scroll->setWidget(content);
+    root->addWidget(scroll);
 
     connect(m_enabled, &QCheckBox::toggled, this, &SyncFolderPage::saveSettings);
     connect(m_localNetworkOnly, &QCheckBox::toggled, this, &SyncFolderPage::saveSettings);
-    connect(m_folderPath, &QLineEdit::editingFinished, this, &SyncFolderPage::saveSettings);
-    connect(m_browseButton, &QPushButton::clicked, this, &SyncFolderPage::chooseFolder);
-    connect(m_openButton, &QPushButton::clicked, this, &SyncFolderPage::openFolder);
+    connect(m_addFolderButton, &QPushButton::clicked, this, &SyncFolderPage::addFolder);
     connect(m_scanButton, &QPushButton::clicked, this, [this] {
         saveSettings();
         m_syncService->scanNow();
@@ -140,10 +148,10 @@ SyncFolderPage::SyncFolderPage(FolderSyncService *syncService, ThemeManager *the
     connect(m_syncService, &FolderSyncService::settingsChanged, this, [this](const FolderSyncSettings &settings) {
         const QSignalBlocker enabledBlocker(m_enabled);
         const QSignalBlocker localOnlyBlocker(m_localNetworkOnly);
-        const QSignalBlocker pathBlocker(m_folderPath);
         m_enabled->setChecked(settings.enabled);
         m_localNetworkOnly->setChecked(settings.localNetworkOnly);
-        m_folderPath->setText(settings.folderPath);
+        if (selectedFolders() != settings.folderPaths)
+            loadFolderRows(settings.folderPaths);
         refreshStatus();
     });
     connect(m_themeManager, &ThemeManager::appearanceChanged, this,
@@ -152,17 +160,13 @@ SyncFolderPage::SyncFolderPage(FolderSyncService *syncService, ThemeManager *the
     refreshStatus();
 }
 
-void SyncFolderPage::chooseFolder()
+void SyncFolderPage::chooseFolder(QLineEdit *field)
 {
-    const QString start = m_folderPath->text().trimmed().isEmpty()
-                              ? QString()
-                              : m_folderPath->text().trimmed();
     const QString folder = QFileDialog::getExistingDirectory(
-        this, tr("Choose sync folder"), start,
-        QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
+        this, tr("Choose sync folder"), field->text().trimmed(), QFileDialog::ShowDirsOnly);
     if (folder.isEmpty())
         return;
-    m_folderPath->setText(folder);
+    field->setText(folder);
     saveSettings();
 }
 
@@ -171,16 +175,98 @@ void SyncFolderPage::saveSettings()
     FolderSyncSettings settings;
     settings.enabled = m_enabled->isChecked();
     settings.localNetworkOnly = m_localNetworkOnly->isChecked();
-    settings.folderPath = m_folderPath->text().trimmed();
+    settings.folderPaths = selectedFolders();
     m_syncService->setSettings(settings);
 }
 
-void SyncFolderPage::openFolder()
+QStringList SyncFolderPage::selectedFolders() const
 {
-    const QString path = m_folderPath->text().trimmed();
-    if (path.isEmpty())
+    QStringList paths;
+    for (auto *field : m_folderPaths) {
+        const QString path = field->text().trimmed();
+        if (!path.isEmpty())
+            paths.append(path);
+    }
+    return paths;
+}
+
+void SyncFolderPage::addFolder()
+{
+    const QString folder = QFileDialog::getExistingDirectory(this, tr("Add sync folder"),
+        selectedFolders().value(0), QFileDialog::ShowDirsOnly);
+    if (folder.isEmpty())
         return;
-    QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+    if (m_folderPaths.size() == 1 && m_folderPaths.first()->text().trimmed().isEmpty())
+        m_folderPaths.first()->setText(folder);
+    else
+        addFolderRow(folder);
+    saveSettings();
+}
+
+void SyncFolderPage::loadFolderRows(const QStringList &paths)
+{
+    m_folderPaths.clear();
+    while (auto *item = m_foldersLayout->takeAt(0)) {
+        if (auto *widget = item->widget()) {
+            widget->hide();
+            widget->deleteLater();
+        }
+        delete item;
+    }
+    if (paths.isEmpty())
+        addFolderRow(QString());
+    else
+        for (const auto &path : paths)
+            addFolderRow(path);
+}
+
+void SyncFolderPage::addFolderRow(const QString &path)
+{
+    auto *row = new QWidget(this);
+    auto *layout = new QHBoxLayout(row);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(8);
+    auto *field = new QLineEdit(path, row);
+    field->setObjectName(QStringLiteral("syncFolderPath"));
+    field->setAccessibleName(tr("Sync folder path"));
+    field->setPlaceholderText(tr("Choose a folder to sync…"));
+    field->setClearButtonEnabled(true);
+    m_folderPaths.append(field);
+    layout->addWidget(field, 1);
+    auto *browse = new QPushButton(tr("Browse…"), row);
+    auto *open = new QPushButton(tr("Open folder"), row);
+    auto *remove = new QPushButton(row);
+    remove->setObjectName(QStringLiteral("removeSyncFolderButton"));
+    configureActionButton(browse, QStringLiteral(":/icons/folder.svg"));
+    configureActionButton(open, QStringLiteral(":/icons/external-link.svg"));
+    configureActionButton(remove, QStringLiteral(":/icons/trash.svg"));
+    remove->setToolTip(tr("Remove folder from sync"));
+    remove->setAccessibleName(tr("Remove folder from sync"));
+    open->setEnabled(!path.trimmed().isEmpty());
+    for (auto *button : {browse, open, remove}) {
+        button->setCursor(Qt::PointingHandCursor);
+        layout->addWidget(button);
+    }
+    m_foldersLayout->addWidget(row);
+    connect(field, &QLineEdit::editingFinished, this, &SyncFolderPage::saveSettings);
+    connect(field, &QLineEdit::textChanged, this, [this, open](const QString &text) {
+        open->setEnabled(!text.trimmed().isEmpty());
+        refreshStatus();
+    });
+    connect(browse, &QPushButton::clicked, this, [this, field] { chooseFolder(field); });
+    connect(open, &QPushButton::clicked, this, [field] {
+        if (!field->text().trimmed().isEmpty())
+            QDesktopServices::openUrl(QUrl::fromLocalFile(field->text().trimmed()));
+    });
+    connect(remove, &QPushButton::clicked, this, [this, row, field] {
+        m_folderPaths.removeOne(field);
+        m_foldersLayout->removeWidget(row);
+        row->hide();
+        row->deleteLater();
+        if (m_folderPaths.isEmpty())
+            addFolderRow(QString());
+        saveSettings();
+    });
 }
 
 void SyncFolderPage::refreshStatus()
@@ -189,9 +275,8 @@ void SyncFolderPage::refreshStatus()
     m_statusIcon->setPixmap(renderSvgIcon(m_syncService->statusIconPath(), color,
                                           QSize(24, 24), devicePixelRatioF()));
     m_statusText->setText(m_syncService->statusMessage());
-    m_openButton->setEnabled(!m_folderPath->text().trimmed().isEmpty());
     m_scanButton->setEnabled(m_enabled->isChecked() &&
-                             !m_folderPath->text().trimmed().isEmpty());
+                             !selectedFolders().isEmpty());
 }
 
 } // namespace Aurora

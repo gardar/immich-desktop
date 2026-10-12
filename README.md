@@ -30,7 +30,7 @@
 - **Library** - Immich-style timeline with compact rows and grouped days
 - **Explore** - people, places, and recent media; open a person or place as an in-app Library-style gallery
 - **Search** - find photos and videos across your library
-- **Folder Sync** - watch a local folder and auto-upload new photos/videos to Immich (Windows, macOS, Linux)
+- **Folder Sync** - watch multiple local folders and auto-upload new photos/videos to Immich (Windows, macOS, Linux); add another folder with **+**
   - Optional **local-network only** mode: upload only when your Immich Local URL is reachable
   - Unsynced files show in Library immediately with an **unsaved** badge (saving / error icons while uploading)
 - **Upload & download** - drag-and-drop, paste, send media to the server, or save it locally
@@ -65,7 +65,7 @@ Snap Store ships `amd64` and `arm64`.
 2. Open the app and go to **Settings → Immich Server**.
 3. Enter your Immich server URL and an API key with permissions such as `user.read`, `asset.read`, `asset.view`, `asset.upload`, `asset.download`, `asset.delete`, and `person.read`. Optionally set a **Local URL** for LAN use.
 4. Test the connection, save, then browse **Library** or **Explore**.
-5. (Optional) Open **Settings → Folder Sync**, choose a folder, enable watching, and turn on **Upload only when Immich is available on the local network** if you only want uploads over LAN. Drop photos or videos into that folder; they appear in Library with sync status badges and upload when allowed.
+5. (Optional) Open **Settings → Folder Sync**, choose folders with the system file picker (use **+** to add more), enable watching, and turn on **Upload only when Immich is available on the local network** if you only want uploads over LAN. Drop photos or videos into those folders; they appear in Library with sync status badges and upload when allowed. Each folder has its own Browse, Open folder, and Remove controls.
 
 ```bash
 # Snap
@@ -85,7 +85,7 @@ Plans can shift , track progress and ideas in
 
 - Library timeline with search, preview, trash, upload & download
 - Explore: people and places as in-page galleries (Library-style person/place views)
-- Folder Sync: watched local folder, LAN-only upload option, unsaved/saving/error badges in Library
+- Folder Sync: multiple watched local folders, LAN-only upload option, unsaved/saving/error badges in Library
 - Video streaming player and hover preview
 - Offline browsing via local disk cache + queued uploads when offline
 - Themes (light / dark / custom), system tray, autostart, single-instance

@@ -219,8 +219,13 @@ FolderSyncSettings AppSettings::loadFolderSync() const
     result.enabled = m_settings.value(QStringLiteral("folderSync/enabled"), false).toBool();
     result.localNetworkOnly =
         m_settings.value(QStringLiteral("folderSync/localNetworkOnly"), false).toBool();
-    result.folderPath =
-        m_settings.value(QStringLiteral("folderSync/folderPath")).toString();
+    if (m_settings.contains(QStringLiteral("folderSync/folderPaths")))
+        result.folderPaths = m_settings.value(QStringLiteral("folderSync/folderPaths")).toStringList();
+    else {
+        const QString legacyFolder = m_settings.value(QStringLiteral("folderSync/folderPath")).toString().trimmed();
+        if (!legacyFolder.isEmpty())
+            result.folderPaths.append(legacyFolder);
+    }
     return result;
 }
 
@@ -229,8 +234,8 @@ void AppSettings::saveFolderSync(const FolderSyncSettings &folderSync)
     m_settings.setValue(QStringLiteral("folderSync/enabled"), folderSync.enabled);
     m_settings.setValue(QStringLiteral("folderSync/localNetworkOnly"),
                         folderSync.localNetworkOnly);
-    m_settings.setValue(QStringLiteral("folderSync/folderPath"),
-                        folderSync.folderPath.trimmed());
+    m_settings.setValue(QStringLiteral("folderSync/folderPaths"), folderSync.folderPaths);
+    m_settings.remove(QStringLiteral("folderSync/folderPath"));
     m_settings.sync();
 }
 
