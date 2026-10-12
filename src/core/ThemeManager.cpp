@@ -125,7 +125,7 @@ QString ThemeManager::buildStyleSheet() const
         QPushButton[windowControl="true"]:hover { background: %6; }
         QPushButton#closeButton:hover { background: #E5484D; color: white; }
         QDialogButtonBox QPushButton { min-width: 88px; }
-        QComboBox, QLineEdit, QSpinBox, QDoubleSpinBox {
+        QComboBox, QLineEdit, QSpinBox, QDoubleSpinBox, QDateEdit {
             background: %6;
             border: 1px solid %4;
             border-radius: 10px;
@@ -133,7 +133,7 @@ QString ThemeManager::buildStyleSheet() const
             min-width: 150px;
         }
         QComboBox:hover, QComboBox:focus, QLineEdit:hover, QLineEdit:focus,
-        QSpinBox:hover, QSpinBox:focus {
+        QSpinBox:hover, QSpinBox:focus, QDateEdit:hover, QDateEdit:focus {
             border-color: %7;
         }
         QComboBox::drop-down { border: none; width: 28px; }

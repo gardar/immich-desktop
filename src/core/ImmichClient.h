@@ -10,6 +10,7 @@
 #include <QDateTime>
 #include <QHash>
 #include <QImage>
+#include <QJsonObject>
 #include <QObject>
 #include <QPixmap>
 #include <QSet>
@@ -44,7 +45,8 @@ public:
     bool isOffline() const { return !isOnline(); }
 
     void testConnection();
-    void loadAssets(int page = 1, int pageSize = 80, const QString &query = {});
+    void loadAssets(int page = 1, int pageSize = 80, const QString &query = {},
+                    const QJsonObject &searchOptions = {});
     void loadTimelineBuckets();
     void loadTimelineBucket(const QDate &month);
     void clearCachedLibrary();
@@ -109,7 +111,8 @@ private:
     QNetworkRequest authenticatedRequest(const QUrl &url) const;
     QString errorMessage(QNetworkReply *reply, const QByteArray &body) const;
     bool ensureConfigured(const QString &operation);
-    void searchAssets(int page, int pageSize, bool pollOnly, const QString &query = {});
+    void searchAssets(int page, int pageSize, bool pollOnly, const QString &query = {},
+                      const QJsonObject &searchOptions = {});
     void searchFilteredAssets(const QString &filterKind, const QString &filterValue,
                               int page, int pageSize);
     void loadImageAsync(const QString &assetId, const QString &resultSize);
@@ -155,6 +158,7 @@ private:
     bool m_usingLocalEndpoint = false;
     bool m_online = false;
     bool m_pollInFlight = false;
+    quint64 m_searchGeneration = 0;
     bool m_uploadInFlight = false;
     bool m_processingUploadQueue = false;
     bool m_uploadRetryScheduled = false;

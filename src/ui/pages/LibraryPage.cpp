@@ -2,6 +2,7 @@
 
 #include "core/AppSettings.h"
 #include "core/FolderSyncService.h"
+#include "ui/IconUtils.h"
 #include "ui/widgets/MediaTile.h"
 #include "ui/widgets/SummaryTile.h"
 #include "ui/widgets/VideoHoverPreview.h"
@@ -14,6 +15,9 @@
 #include <QApplication>
 #include <QBuffer>
 #include <QClipboard>
+#include <QCheckBox>
+#include <QComboBox>
+#include <QDateEdit>
 #include <QDateTime>
 #include <QDialog>
 #include <QDialogButtonBox>
@@ -26,9 +30,12 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QFocusEvent>
 #include <QHideEvent>
 #include <QHBoxLayout>
+#include <QGridLayout>
 #include <QImage>
+#include <QJsonArray>
 #include <QKeySequence>
 #include <QLabel>
 #include <QLineEdit>
@@ -42,6 +49,7 @@
 #include <QScrollBar>
 #include <QSet>
 #include <QShortcut>
+#include <QSignalBlocker>
 #include <QShowEvent>
 #include <QStackedWidget>
 #include <QStandardPaths>
@@ -122,6 +130,7 @@ LibraryPage::LibraryPage(ImmichClient *client, FolderSyncService *folderSync,
     auto *toolbar = new QWidget(this);
     toolbar->setObjectName(QStringLiteral("libraryToolbar"));
     auto *toolbarLayout = new QHBoxLayout(toolbar);
+    m_searchToolbarLayout = toolbarLayout;
     toolbarLayout->setContentsMargins(16, 12, 16, 10);
     toolbarLayout->setSpacing(12);
 
@@ -136,10 +145,24 @@ LibraryPage::LibraryPage(ImmichClient *client, FolderSyncService *folderSync,
     toolbarLayout->addLayout(headingColumn, 1);
 
     m_searchField->setPlaceholderText(tr("Search photos and videos…"));
+    m_searchField->setObjectName(QStringLiteral("librarySearchField"));
     m_searchField->setClearButtonEnabled(true);
     m_searchField->setMinimumWidth(220);
     m_searchField->setMaximumWidth(360);
-    toolbarLayout->addWidget(m_searchField);
+    m_searchField->installEventFilter(this);
+    toolbarLayout->addWidget(m_searchField, 1);
+    m_searchSettingsButton = new QPushButton(toolbar);
+    m_searchSettingsButton->setIcon(QIcon(renderSvgIcon(QStringLiteral(":/icons/settings.svg"),
+        palette().color(QPalette::ButtonText), QSize(20, 20))));
+    m_searchSettingsButton->installEventFilter(this);
+    m_searchSettingsButton->setCheckable(true);
+    m_searchSettingsButton->setObjectName(QStringLiteral("searchSettingsButton"));
+    m_searchSettingsButton->setFixedWidth(40);
+    m_searchSettingsButton->setToolTip(tr("Search settings"));
+    m_searchSettingsButton->setAccessibleName(tr("Search settings"));
+    m_searchSettingsButton->setCursor(Qt::PointingHandCursor);
+    m_searchSettingsButton->hide();
+    toolbarLayout->addWidget(m_searchSettingsButton);
     toolbarLayout->addWidget(m_uploadButton);
     toolbarLayout->addWidget(m_refreshButton);
     toolbarLayout->addWidget(m_yearsButton);
@@ -239,6 +262,90 @@ LibraryPage::LibraryPage(ImmichClient *client, FolderSyncService *folderSync,
     m_contentStack->addWidget(yearDetailPage);
 
     root->addWidget(toolbar);
+    m_searchPanel = new QWidget(this);
+    m_searchPanel->setObjectName(QStringLiteral("searchOptionsPanel"));
+    auto *searchLayout = new QVBoxLayout(m_searchPanel);
+    searchLayout->setContentsMargins(16, 0, 16, 14);
+    searchLayout->setSpacing(10);
+    auto *filterHeader = new QHBoxLayout;
+    auto *filterTitle = new QLabel(tr("Filter by"), m_searchPanel);
+    filterTitle->setProperty("section", true);
+    filterHeader->addWidget(filterTitle);
+    filterHeader->addStretch();
+    auto *resetSearch = new QPushButton(tr("Reset filters"), m_searchPanel);
+    filterHeader->addWidget(resetSearch);
+    searchLayout->addLayout(filterHeader);
+
+    auto *filters = new QGridLayout;
+    filters->setHorizontalSpacing(12);
+    filters->setVerticalSpacing(6);
+    auto addFilter = [this, filters](const QString &label, QWidget *field, int column) {
+        auto *caption = new QLabel(label, m_searchPanel);
+        caption->setBuddy(field);
+        field->setAccessibleName(label);
+        filters->addWidget(caption, 0, column);
+        filters->addWidget(field, 1, column);
+        filters->setColumnStretch(column, 1);
+    };
+    m_searchScope = new QComboBox(m_searchPanel);
+    m_searchScope->setObjectName(QStringLiteral("searchScope"));
+    m_searchScope->addItems({tr("All assets"), tr("Favorites"), tr("Archive")});
+    addFilter(tr("Search in"), m_searchScope, 0);
+    m_searchPerson = new QComboBox(m_searchPanel);
+    m_searchPerson->setObjectName(QStringLiteral("searchPerson"));
+    m_searchPerson->addItem(tr("All people"), QString());
+    m_searchPerson->setMinimumContentsLength(12);
+    m_searchPerson->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+    addFilter(tr("People"), m_searchPerson, 1);
+    m_searchPlace = new QLineEdit(m_searchPanel);
+    m_searchPlace->setObjectName(QStringLiteral("searchPlace"));
+    m_searchPlace->setPlaceholderText(tr("City"));
+    m_searchPlace->setClearButtonEnabled(true);
+    addFilter(tr("Places"), m_searchPlace, 2);
+    m_searchMedia = new QComboBox(m_searchPanel);
+    m_searchMedia->setObjectName(QStringLiteral("searchMedia"));
+    m_searchMedia->addItem(tr("Photos and videos"), QString());
+    m_searchMedia->addItem(tr("Photos"), QStringLiteral("IMAGE"));
+    m_searchMedia->addItem(tr("Videos"), QStringLiteral("VIDEO"));
+    addFilter(tr("Media"), m_searchMedia, 3);
+    searchLayout->addLayout(filters);
+
+    auto *dateRow = new QHBoxLayout;
+    m_searchDateEnabled = new QCheckBox(tr("Date"), m_searchPanel);
+    m_searchDateEnabled->setObjectName(QStringLiteral("searchDateEnabled"));
+    m_searchDateFrom = new QDateEdit(QDate::currentDate().addYears(-1), m_searchPanel);
+    m_searchDateTo = new QDateEdit(QDate::currentDate(), m_searchPanel);
+    m_searchDateFrom->setAccessibleName(tr("From date"));
+    m_searchDateTo->setAccessibleName(tr("To date"));
+    for (auto *field : {m_searchDateFrom, m_searchDateTo}) {
+        field->setCalendarPopup(true);
+        field->setDisplayFormat(QStringLiteral("yyyy-MM-dd"));
+        field->setEnabled(false);
+    }
+    dateRow->addWidget(m_searchDateEnabled);
+    dateRow->addWidget(new QLabel(tr("From"), m_searchPanel));
+    dateRow->addWidget(m_searchDateFrom);
+    dateRow->addWidget(new QLabel(tr("To"), m_searchPanel));
+    dateRow->addWidget(m_searchDateTo);
+    dateRow->addStretch();
+    searchLayout->addLayout(dateRow);
+
+    auto *interpretation = new QLabel(tr("Choose how Immich interprets your search: "
+        "by visual content, file details, or embedded text."), m_searchPanel);
+    interpretation->setWordWrap(true);
+    interpretation->setProperty("subheading", true);
+    searchLayout->addWidget(interpretation);
+    m_searchMode = new QComboBox(m_searchPanel);
+    m_searchMode->setObjectName(QStringLiteral("searchMode"));
+    m_searchMode->addItem(tr("Context"), QString());
+    m_searchMode->addItem(tr("File name"), QStringLiteral("originalFileName"));
+    m_searchMode->addItem(tr("Description"), QStringLiteral("description"));
+    m_searchMode->addItem(tr("Full path or folder"), QStringLiteral("originalPath"));
+    m_searchMode->addItem(tr("OCR"), QStringLiteral("ocr"));
+    m_searchMode->setAccessibleName(tr("Search interpretation"));
+    searchLayout->addWidget(m_searchMode);
+    m_searchPanel->hide();
+    root->addWidget(m_searchPanel);
     root->addWidget(m_emptyState);
     root->addWidget(m_contentStack, 1);
 
@@ -249,7 +356,51 @@ LibraryPage::LibraryPage(ImmichClient *client, FolderSyncService *folderSync,
     connect(m_uploadButton, &QPushButton::clicked, this, &LibraryPage::chooseFilesToUpload);
     connect(m_refreshButton, &QPushButton::clicked, this, &LibraryPage::refresh);
     connect(m_searchField, &QLineEdit::textChanged, this, [this] {
+        updateSearchExpansion();
         m_searchDebounce->start();
+    });
+    connect(qApp, &QApplication::focusChanged, this, [this] {
+        QTimer::singleShot(0, this, &LibraryPage::updateSearchExpansion);
+    });
+    connect(m_searchSettingsButton, &QPushButton::toggled, this, [this](bool open) {
+        m_searchPanel->setVisible(open);
+        updateSearchExpansion();
+        if (open && m_searchPerson->count() == 1 && m_client->isOnline())
+            m_client->loadExplore();
+    });
+    auto optionsChanged = [this] {
+        if (!m_resettingSearchOptions)
+            m_searchDebounce->start();
+    };
+    for (auto *field : {m_searchScope, m_searchPerson, m_searchMedia, m_searchMode})
+        connect(field, &QComboBox::currentIndexChanged, this, optionsChanged);
+    connect(m_searchPlace, &QLineEdit::textChanged, this, optionsChanged);
+    connect(m_searchDateFrom, &QDateEdit::dateChanged, this, optionsChanged);
+    connect(m_searchDateTo, &QDateEdit::dateChanged, this, optionsChanged);
+    connect(m_searchDateEnabled, &QCheckBox::toggled, this, [this, optionsChanged](bool enabled) {
+        m_searchDateFrom->setEnabled(enabled);
+        m_searchDateTo->setEnabled(enabled);
+        optionsChanged();
+    });
+    connect(resetSearch, &QPushButton::clicked, this, [this] {
+        m_resettingSearchOptions = true;
+        for (auto *field : {m_searchScope, m_searchPerson, m_searchMedia, m_searchMode})
+            field->setCurrentIndex(0);
+        m_searchPlace->clear();
+        m_searchDateEnabled->setChecked(false);
+        m_resettingSearchOptions = false;
+        m_searchDebounce->stop();
+        applySearch();
+    });
+    connect(m_client, &ImmichClient::exploreLoaded, this, [this](const ImmichExploreData &data) {
+        const QString selected = m_searchPerson->currentData().toString();
+        const QSignalBlocker blocker(m_searchPerson);
+        m_searchPerson->clear();
+        m_searchPerson->addItem(tr("All people"), QString());
+        for (const auto &person : data.people)
+            m_searchPerson->addItem(person.name.isEmpty() ? tr("Unnamed person") : person.name, person.id);
+        const int index = m_searchPerson->findData(selected);
+        m_searchPerson->setCurrentIndex(qMax(0, index));
     });
     connect(m_searchField, &QLineEdit::returnPressed, this, [this] {
         m_searchDebounce->stop();
@@ -289,6 +440,8 @@ LibraryPage::LibraryPage(ImmichClient *client, FolderSyncService *folderSync,
     connect(m_client, &ImmichClient::configurationChanged, this, [this](bool configured) {
         m_uploadButton->setEnabled(configured);
         m_searchField->setEnabled(configured);
+        m_searchSettingsButton->setEnabled(configured);
+        m_searchPanel->setEnabled(configured);
         if (configured)
             refresh();
         else {
@@ -302,6 +455,8 @@ LibraryPage::LibraryPage(ImmichClient *client, FolderSyncService *folderSync,
 
     m_uploadButton->setEnabled(m_client->isConfigured());
     m_searchField->setEnabled(m_client->isConfigured());
+    m_searchSettingsButton->setEnabled(m_client->isConfigured());
+    m_searchPanel->setEnabled(m_client->isConfigured());
     updateEmptyState();
     updateAutoCheckTimer();
     updateEndpointHint();
@@ -337,7 +492,7 @@ void LibraryPage::refresh()
     if (m_loading)
         return;
 
-    if (!m_searchQuery.isEmpty()) {
+    if (m_searchActive) {
         requestPage(1, false);
         return;
     }
@@ -364,7 +519,7 @@ void LibraryPage::refresh()
 
 bool LibraryPage::hasMoreToLoad() const
 {
-    if (!m_searchQuery.isEmpty())
+    if (m_searchActive)
         return !m_nextPage.isEmpty();
     return m_nextBucketIndex < m_monthBuckets.size();
 }
@@ -374,7 +529,7 @@ void LibraryPage::loadMore()
     if (m_loading)
         return;
 
-    if (!m_searchQuery.isEmpty()) {
+    if (m_searchActive) {
         bool ok = false;
         const int page = m_nextPage.toInt(&ok);
         if (ok && page > 0)
@@ -408,20 +563,31 @@ void LibraryPage::loadNextTimelineBucket()
 void LibraryPage::checkForNewPhotos()
 {
     if (!isVisible() || m_loading || m_autoRefreshPending || !m_client->isConfigured() ||
-        !m_searchQuery.isEmpty())
+        m_searchActive)
         return;
     m_client->pollNewestAssets(24);
 }
 
 void LibraryPage::applySearch()
 {
+    if (m_searchDateEnabled->isChecked() && m_searchDateFrom->date() > m_searchDateTo->date()) {
+        m_status->setText(tr("The start date must be on or before the end date."));
+        return;
+    }
     const QString query = m_searchField->text().trimmed();
-    if (query == m_searchQuery)
+    const QJsonObject options = searchOptions();
+    if (query == m_searchQuery && options == m_searchOptions)
         return;
     m_searchQuery = query;
+    m_searchOptions = options;
+    QJsonObject filters = options;
+    filters.remove(QStringLiteral("mode"));
+    m_searchActive = !query.isEmpty() || !filters.isEmpty();
+    m_contentStack->setCurrentIndex(0);
+    m_nextPage.clear();
     updateAutoCheckTimer();
     // Clearing search must return to timeline buckets, not flat /search/metadata.
-    if (m_searchQuery.isEmpty() && m_client->isOnline()) {
+    if (!m_searchActive && m_client->isOnline()) {
         m_loading = false; // allow refresh() even if a search request is still in flight
         refresh();
         return;
@@ -429,9 +595,47 @@ void LibraryPage::applySearch()
     requestPage(1, false);
 }
 
+QJsonObject LibraryPage::searchOptions() const
+{
+    QJsonObject options;
+    const QString mode = m_searchMode->currentData().toString();
+    if (!mode.isEmpty())
+        options.insert(QStringLiteral("mode"), mode);
+    if (m_searchScope->currentIndex() == 1)
+        options.insert(QStringLiteral("isFavorite"), true);
+    else if (m_searchScope->currentIndex() == 2)
+        options.insert(QStringLiteral("visibility"), QStringLiteral("archive"));
+    const QString personId = m_searchPerson->currentData().toString();
+    if (!personId.isEmpty())
+        options.insert(QStringLiteral("personIds"), QJsonArray{personId});
+    const QString city = m_searchPlace->text().trimmed();
+    if (!city.isEmpty())
+        options.insert(QStringLiteral("city"), city);
+    const QString media = m_searchMedia->currentData().toString();
+    if (!media.isEmpty())
+        options.insert(QStringLiteral("type"), media);
+    if (m_searchDateEnabled->isChecked()) {
+        options.insert(QStringLiteral("takenAfter"),
+            m_searchDateFrom->date().startOfDay().toUTC().toString(Qt::ISODate));
+        options.insert(QStringLiteral("takenBefore"),
+            m_searchDateTo->date().endOfDay().toUTC().toString(Qt::ISODateWithMs));
+    }
+    return options;
+}
+
+void LibraryPage::updateSearchExpansion()
+{
+    const bool expanded = m_searchField->hasFocus() || !m_searchField->text().isEmpty()
+        || m_searchSettingsButton->hasFocus() || m_searchSettingsButton->isChecked()
+        || m_searchPanel->isAncestorOf(QApplication::focusWidget());
+    m_searchSettingsButton->setVisible(m_searchActivated && expanded);
+    m_searchField->setMaximumWidth(expanded ? 520 : 360);
+    m_searchToolbarLayout->setStretch(0, expanded ? 0 : 1);
+}
+
 void LibraryPage::handleNewestAssetsPolled(const QList<ImmichAsset> &assets)
 {
-    if (m_loading || m_autoRefreshPending || !m_searchQuery.isEmpty())
+    if (m_loading || m_autoRefreshPending || m_searchActive)
         return;
 
     int newCount = 0;
@@ -458,15 +662,16 @@ void LibraryPage::requestPage(int page, bool append)
     m_appendRequest = append;
     m_refreshButton->setEnabled(false);
     if (!m_autoRefreshPending) {
-        if (!m_searchQuery.isEmpty()) {
+        if (m_searchActive) {
             m_status->setText(append ? tr("Loading more results…")
-                                     : tr("Searching for “%1”…").arg(m_searchQuery));
+                : (m_searchQuery.isEmpty() ? tr("Searching with filters…")
+                                          : tr("Searching for “%1”…").arg(m_searchQuery)));
         } else {
             m_status->setText(append ? tr("Loading more media…")
                                      : tr("Loading your library…"));
         }
     }
-    m_client->loadAssets(page, 80, m_searchQuery);
+    m_client->loadAssets(page, 80, m_searchQuery, m_searchActive ? m_searchOptions : QJsonObject{});
 }
 
 LibraryPage::DaySection *LibraryPage::sectionForDate(const QDate &date)
@@ -530,9 +735,9 @@ void LibraryPage::showAssets(const QList<ImmichAsset> &assets, const QString &ne
     m_loading = false;
     m_autoRefreshPending = false;
     m_refreshButton->setEnabled(true);
-    if (!m_searchQuery.isEmpty()) {
-        m_status->setText(tr("%n result(s) for “%1”", nullptr, m_assets.size())
-                              .arg(m_searchQuery));
+    if (m_searchActive) {
+        m_status->setText(m_searchQuery.isEmpty() ? tr("%n filtered result(s)", nullptr, m_assets.size())
+            : tr("%n result(s) for “%1”", nullptr, m_assets.size()).arg(m_searchQuery));
     } else if (fromCache) {
         m_status->setText(tr("%n cached item(s) · offline", nullptr, m_assets.size()));
     } else {
@@ -634,7 +839,7 @@ void LibraryPage::syncPendingLocalAssets()
         return;
 
     // Keep search results clean - local pending only in the main timeline.
-    if (!m_searchQuery.isEmpty()) {
+    if (m_searchActive) {
         const QStringList localIds = m_localAssetIds.values();
         for (const QString &id : localIds)
             removeLocalAsset(id);
@@ -672,7 +877,7 @@ void LibraryPage::syncPendingLocalAssets()
 
 void LibraryPage::handleTimelineBucketsLoaded(const QList<TimeBucketInfo> &buckets)
 {
-    if (!m_searchQuery.isEmpty())
+    if (m_searchActive)
         return;
 
     m_monthBuckets = buckets;
@@ -714,7 +919,7 @@ void LibraryPage::handleTimelineBucketLoaded(const QDate &month,
         return;
     }
 
-    if (!m_searchQuery.isEmpty())
+    if (m_searchActive)
         return;
     // Ignore a stale reply that no longer matches where the cursor is (e.g.
     // a refresh reset things while this request was in flight).
@@ -1388,9 +1593,10 @@ void LibraryPage::updateEmptyState()
                "to browse photos and videos."));
         return;
     }
-    if (!m_searchQuery.isEmpty()) {
+    if (m_searchActive) {
         m_emptyState->setText(
-            tr("No results for “%1”.\nTry a different search.").arg(m_searchQuery));
+            m_searchQuery.isEmpty() ? tr("No results for these filters.\nTry different filters.")
+                : tr("No results for “%1”.\nTry a different search or filters.").arg(m_searchQuery));
         return;
     }
     m_emptyState->setText(
@@ -1400,7 +1606,7 @@ void LibraryPage::updateEmptyState()
 
 void LibraryPage::updateAutoCheckTimer()
 {
-    if (m_client->isConfigured() && isVisible() && m_searchQuery.isEmpty()) {
+    if (m_client->isConfigured() && isVisible() && !m_searchActive) {
         if (!m_autoCheckTimer->isActive())
             m_autoCheckTimer->start();
     } else {
@@ -1410,7 +1616,7 @@ void LibraryPage::updateAutoCheckTimer()
 
 void LibraryPage::updateEndpointHint()
 {
-    if (!m_client->isConfigured() || m_loading || !m_searchQuery.isEmpty())
+    if (!m_client->isConfigured() || m_loading || m_searchActive)
         return;
     if (!m_client->connection().hasLocalServerUrl())
         return;
@@ -1592,7 +1798,7 @@ bool LibraryPage::isSearchFieldFocused() const
 {
     QWidget *focus = QApplication::focusWidget();
     while (focus) {
-        if (focus == m_searchField)
+        if (focus == m_searchField || focus == m_searchPanel)
             return true;
         focus = focus->parentWidget();
     }
@@ -1970,7 +2176,22 @@ bool LibraryPage::handleDragEvent(QEvent *event)
 
 bool LibraryPage::eventFilter(QObject *watched, QEvent *event)
 {
-    Q_UNUSED(watched);
+    if (watched == m_searchField && event->type() == QEvent::MouseButtonPress) {
+        m_searchActivated = true;
+        updateSearchExpansion();
+    }
+    if (watched == m_searchField && event->type() == QEvent::FocusIn) {
+        const auto reason = static_cast<QFocusEvent *>(event)->reason();
+        if (reason == Qt::MouseFocusReason || reason == Qt::TabFocusReason
+            || reason == Qt::BacktabFocusReason || reason == Qt::ShortcutFocusReason)
+            m_searchActivated = true;
+    }
+    if (watched == m_searchField &&
+        (event->type() == QEvent::FocusIn || event->type() == QEvent::FocusOut))
+        QTimer::singleShot(0, this, &LibraryPage::updateSearchExpansion);
+    if (watched == m_searchSettingsButton && event->type() == QEvent::PaletteChange)
+        m_searchSettingsButton->setIcon(QIcon(renderSvgIcon(QStringLiteral(":/icons/settings.svg"),
+            m_searchSettingsButton->palette().color(QPalette::ButtonText), QSize(20, 20))));
     if (handleDragEvent(event))
         return true;
     return QWidget::eventFilter(watched, event);

@@ -10,10 +10,14 @@
 #include <QWidget>
 
 class QDragEnterEvent;
+class QComboBox;
+class QCheckBox;
+class QDateEdit;
 class QDragLeaveEvent;
 class QDropEvent;
 class QEvent;
 class QHideEvent;
+class QHBoxLayout;
 class QLabel;
 class QLineEdit;
 class QPushButton;
@@ -115,6 +119,8 @@ private:
     bool pasteClipboardFiles();
     bool pasteClipboardImage();
     bool isSearchFieldFocused() const;
+    QJsonObject searchOptions() const;
+    void updateSearchExpansion();
     ImmichAsset currentAssetForClipboard() const;
     void confirmAndDelete(const Aurora::ImmichAsset &asset, bool permanent);
     void removeAssetsFromTimeline(const QStringList &assetIds);
@@ -161,6 +167,21 @@ private:
     QLabel *m_emptyState;
     QLabel *m_dropOverlay;
     QLineEdit *m_searchField;
+    QHBoxLayout *m_searchToolbarLayout = nullptr;
+    QPushButton *m_searchSettingsButton = nullptr;
+    QWidget *m_searchPanel = nullptr;
+    QComboBox *m_searchMode = nullptr;
+    QComboBox *m_searchScope = nullptr;
+    QComboBox *m_searchPerson = nullptr;
+    QComboBox *m_searchMedia = nullptr;
+    QLineEdit *m_searchPlace = nullptr;
+    QCheckBox *m_searchDateEnabled = nullptr;
+    QDateEdit *m_searchDateFrom = nullptr;
+    QDateEdit *m_searchDateTo = nullptr;
+    QJsonObject m_searchOptions;
+    bool m_searchActive = false;
+    bool m_searchActivated = false;
+    bool m_resettingSearchOptions = false;
     QPushButton *m_uploadButton;
     QPushButton *m_refreshButton;
     QPushButton *m_yearsButton;

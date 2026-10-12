@@ -543,13 +543,15 @@ void ImmichClient::finishConnectionTest()
     });
 }
 
-void ImmichClient::loadAssets(int page, int pageSize, const QString &query)
+void ImmichClient::loadAssets(int page, int pageSize, const QString &query,
+                              const QJsonObject &searchOptions)
 {
-    searchAssets(page, pageSize, false, query);
+    searchAssets(page, pageSize, false, query, searchOptions);
 }
 
 void ImmichClient::loadTimelineBuckets()
 {
+    ++m_searchGeneration;
     if (!ensureConfigured(tr("Load library")))
         return;
     if (!m_online) {
@@ -636,7 +638,8 @@ void ImmichClient::pollNewestAssets(int pageSize)
     searchAssets(1, pageSize, true);
 }
 
-void ImmichClient::searchAssets(int page, int pageSize, bool pollOnly, const QString &query)
+void ImmichClient::searchAssets(int page, int pageSize, bool pollOnly, const QString &query,
+                                const QJsonObject &searchOptions)
 {
     if (!ensureConfigured(pollOnly ? tr("Check for new photos")
                                    : (query.trimmed().isEmpty() ? tr("Load library")
@@ -647,23 +650,30 @@ void ImmichClient::searchAssets(int page, int pageSize, bool pollOnly, const QSt
     }
 
     const QString trimmedQuery = query.trimmed();
-    const bool smartSearch = !pollOnly && !trimmedQuery.isEmpty();
+    const QString mode = searchOptions.value(QStringLiteral("mode")).toString();
+    QJsonObject filters = searchOptions;
+    filters.remove(QStringLiteral("mode"));
+    const bool filteredSearch = !pollOnly && (!trimmedQuery.isEmpty() || !filters.isEmpty());
+    const bool smartSearch = !pollOnly && !trimmedQuery.isEmpty() && mode.isEmpty();
+    const quint64 generation = pollOnly ? m_searchGeneration : ++m_searchGeneration;
 
     if (!pollOnly && !m_online) {
-        if (page <= 1 && emitCachedLibrary(trimmedQuery))
+        if (!filteredSearch && page <= 1 && emitCachedLibrary(trimmedQuery))
             return;
-        emit requestFailed(smartSearch ? tr("Search") : tr("Load library"),
+        emit requestFailed(filteredSearch ? tr("Search") : tr("Load library"),
                            tr("You are offline and no cached library is available."));
         return;
     }
 
-    QJsonObject body;
+    QJsonObject body = pollOnly ? QJsonObject{} : filters;
     body.insert(QStringLiteral("page"), qMax(1, page));
     body.insert(QStringLiteral("size"), qBound(1, pageSize, 250));
     body.insert(QStringLiteral("withExif"), true);
     if (smartSearch) {
         body.insert(QStringLiteral("query"), trimmedQuery);
     } else {
+        if (!pollOnly && !trimmedQuery.isEmpty() && !mode.isEmpty())
+            body.insert(mode, trimmedQuery);
         body.insert(QStringLiteral("order"), QStringLiteral("desc"));
         body.insert(QStringLiteral("withStacked"), true);
     }
@@ -676,8 +686,12 @@ void ImmichClient::searchAssets(int page, int pageSize, bool pollOnly, const QSt
     searchRequest.setTransferTimeout(20000);
     auto *reply = m_network->post(searchRequest, QJsonDocument(body).toJson(QJsonDocument::Compact));
     connect(reply, &QNetworkReply::finished, this,
-            [this, reply, pollOnly, smartSearch, trimmedQuery, page] {
+            [this, reply, pollOnly, filteredSearch, trimmedQuery, page, generation] {
         const QByteArray body = reply->readAll();
+        if (!pollOnly && generation != m_searchGeneration) {
+            reply->deleteLater();
+            return;
+        }
         if (pollOnly)
             m_pollInFlight = false;
 
@@ -685,11 +699,11 @@ void ImmichClient::searchAssets(int page, int pageSize, bool pollOnly, const QSt
             if (isTransientNetworkError(reply))
                 setOnline(false);
             if (!pollOnly) {
-                if (page <= 1 && emitCachedLibrary(trimmedQuery)) {
+                if (!filteredSearch && page <= 1 && emitCachedLibrary(trimmedQuery)) {
                     reply->deleteLater();
                     return;
                 }
-                emit requestFailed(smartSearch ? tr("Search") : tr("Load library"),
+                emit requestFailed(filteredSearch ? tr("Search") : tr("Load library"),
                                    errorMessage(reply, body));
             }
             reply->deleteLater();
@@ -703,7 +717,7 @@ void ImmichClient::searchAssets(int page, int pageSize, bool pollOnly, const QSt
         if (pollOnly) {
             emit newestAssetsPolled(assets);
         } else {
-            if (!smartSearch) {
+            if (!filteredSearch) {
                 if (page <= 1)
                     m_offlineStore.saveLibrary(m_connection.serverUrl, assets, trimmedQuery);
                 else
