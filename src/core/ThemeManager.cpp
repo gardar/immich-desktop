@@ -188,7 +188,19 @@ QString ThemeManager::buildStyleSheet() const
         QSpinBox:hover, QSpinBox:focus, QDateEdit:hover, QDateEdit:focus {
             border-color: %7;
         }
-        QComboBox::drop-down { border: none; width: 28px; }
+        QComboBox, QDateEdit { padding-right: 30px; }
+        QComboBox::drop-down, QDateEdit::drop-down {
+            subcontrol-origin: padding;
+            subcontrol-position: top right;
+            background: transparent;
+            border: none;
+            width: 28px;
+        }
+        QComboBox::down-arrow, QDateEdit::down-arrow {
+            image: url(%8);
+            width: 14px;
+            height: 14px;
+        }
         QComboBox QAbstractItemView {
             background: %3;
             border: 1px solid %4;
@@ -307,7 +319,9 @@ QString ThemeManager::buildStyleSheet() const
         }
     )")
         .arg(p.text.name(), p.background.name(), p.panel.name(), p.border.name(),
-             p.mutedText.name(), p.button.name(), hover);
+             p.mutedText.name(), p.button.name(), hover,
+             isDarkPalette(p) ? QStringLiteral(":/ui/chevron-down-dark.svg")
+                              : QStringLiteral(":/ui/chevron-down-light.svg"));
 }
 
 } // namespace Aurora
