@@ -286,6 +286,7 @@ void MediaTile::contextMenuEvent(QContextMenuEvent *event)
         if (!m_asset.isVideo())
             menu.addAction(tr("Copy"), this, [this] { emit copyRequested(m_asset); });
         menu.addAction(tr("Download"), this, [this] { emit downloadRequested(m_asset); });
+        menu.addAction(tr("Share link…"), this, [this] { emit shareRequested(m_asset); });
         menu.addSeparator();
         menu.addAction(tr("Move to trash"), this, [this] { emit trashRequested(m_asset); });
         menu.addAction(tr("Delete permanently"), this,

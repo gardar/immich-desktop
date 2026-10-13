@@ -3,6 +3,7 @@
 #include "core/AppSettings.h"
 #include "ui/IconUtils.h"
 #include "ui/widgets/MediaTile.h"
+#include "ui/widgets/ShareLinkDialog.h"
 #include "ui/widgets/VideoHoverPreview.h"
 #include "ui/widgets/VideoPlayerDialog.h"
 #include "ui/widgets/ZoomPanWidget.h"
@@ -307,6 +308,12 @@ ExplorePage::ExplorePage(ImmichClient *client, QWidget *parent)
     m_previewTitle->setProperty("heading", true);
     previewToolbarLayout->addWidget(m_previewBack);
     previewToolbarLayout->addWidget(m_previewTitle, 1);
+    auto *sharePreview = new QPushButton(tr("Share link"), previewToolbar);
+    configureActionButton(sharePreview, QStringLiteral(":/icons/external-link.svg"));
+    previewToolbarLayout->addWidget(sharePreview);
+    connect(sharePreview, &QPushButton::clicked, this, [this] {
+        (new ShareLinkDialog(m_client, m_previewAsset, this))->show();
+    });
 
     m_previewView = new ZoomPanWidget(m_previewPage);
     m_previewView->setPlaceholderText(tr("Loading preview…"));
@@ -767,6 +774,9 @@ void ExplorePage::appendCollectionAssets(const QList<ImmichAsset> &assets)
             m_previewFromCollection = true;
             openAsset(asset);
         });
+        connect(tile, &MediaTile::shareRequested, this, [this](const ImmichAsset &asset) {
+            (new ShareLinkDialog(m_client, asset, this))->show();
+        });
     }
 }
 
@@ -968,6 +978,7 @@ void ExplorePage::backToCollection()
 void ExplorePage::showPreviewPage(const ImmichAsset &asset)
 {
     m_previewAssetId = asset.id;
+    m_previewAsset = asset;
     m_previewTitle->setText(asset.fileName.isEmpty() ? tr("Photo") : asset.fileName);
     m_previewView->setPixmap({});
     m_previewView->setPlaceholderText(tr("Loading preview…"));

@@ -17,6 +17,7 @@
 #include <QStringList>
 #include <QThreadPool>
 #include <QUrl>
+#include <QUuid>
 
 class QNetworkAccessManager;
 class QNetworkInformation;
@@ -65,6 +66,8 @@ public:
                        const QString &suggestedFileName = {});
     void fetchAssetOriginal(const QString &assetId);
     void deleteAssets(const QStringList &assetIds, bool permanent = false);
+    void createSharedLink(const QString &assetId, const QUuid &requestId);
+    QUrl sharedLinkUrl(const QString &key) const;
     bool isUploading() const;
     bool isDownloading() const;
     int pendingUploadCount() const;
@@ -99,6 +102,8 @@ signals:
     void assetOriginalFetched(const QString &assetId, const QByteArray &bytes,
                               const QString &contentType);
     void assetsDeleted(const QStringList &assetIds, bool permanent);
+    void sharedLinkCreated(const QUuid &requestId, const QUrl &url);
+    void sharedLinkFailed(const QUuid &requestId, const QString &message);
     void requestFailed(const QString &operation, const QString &message);
     void transferActivityChanged();
 

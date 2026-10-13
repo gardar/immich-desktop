@@ -4,6 +4,7 @@
 #include "core/FolderSyncService.h"
 #include "ui/IconUtils.h"
 #include "ui/widgets/MediaTile.h"
+#include "ui/widgets/ShareLinkDialog.h"
 #include "ui/widgets/SummaryTile.h"
 #include "ui/widgets/VideoHoverPreview.h"
 #include "ui/widgets/VideoPlayerDialog.h"
@@ -917,6 +918,9 @@ void LibraryPage::appendAssetsToTimeline(const QList<ImmichAsset> &assets)
         });
         connect(tile, &MediaTile::copyRequested, this, &LibraryPage::copyAsset);
         connect(tile, &MediaTile::downloadRequested, this, &LibraryPage::downloadAsset);
+        connect(tile, &MediaTile::shareRequested, this, [this](const ImmichAsset &asset) {
+            (new ShareLinkDialog(m_client, asset, this))->show();
+        });
         connect(tile, &MediaTile::trashRequested, this, &LibraryPage::trashAsset);
         connect(tile, &MediaTile::deleteRequested, this, &LibraryPage::deleteAssetPermanently);
     }
@@ -1848,6 +1852,11 @@ void LibraryPage::openAsset(const ImmichAsset &asset)
     auto *buttons = new QDialogButtonBox(dialog);
     auto *copyButton = buttons->addButton(tr("Copy"), QDialogButtonBox::ActionRole);
     auto *downloadButton = buttons->addButton(tr("Download"), QDialogButtonBox::ActionRole);
+    auto *shareButton = buttons->addButton(tr("Share link"), QDialogButtonBox::ActionRole);
+    configureActionButton(shareButton, QStringLiteral(":/icons/external-link.svg"));
+    connect(shareButton, &QPushButton::clicked, dialog, [this, asset, dialog] {
+        (new ShareLinkDialog(m_client, asset, dialog))->show();
+    });
     auto *trashButton = buttons->addButton(tr("Move to trash"), QDialogButtonBox::ActionRole);
     auto *deleteButton =
         buttons->addButton(tr("Delete permanently"), QDialogButtonBox::DestructiveRole);

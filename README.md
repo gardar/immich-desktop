@@ -31,6 +31,7 @@
 - **Explore** - people, places, and recent media; open a person or place as an in-app Library-style gallery
 - **Search** - find photos and videos across your library
 - **Folder Sync** - watch multiple local folders and auto-upload new photos/videos to Immich (Windows, macOS, Linux); add another folder with **+**
+- **Sharing** - create and copy photo/video share links from the context menu or media preview; links use your main Immich URL even when connected through Local URL
   - Optional **local-network only** mode: upload only when your Immich Local URL is reachable
   - Unsynced files show in Library immediately with an **unsaved** badge (saving / error icons while uploading)
 - **Upload & download** - drag-and-drop, paste, send media to the server, or save it locally

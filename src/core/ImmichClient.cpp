@@ -1538,6 +1538,77 @@ void ImmichClient::deleteAssets(const QStringList &assetIds, bool permanent)
     });
 }
 
+QUrl ImmichClient::sharedLinkUrl(const QString &key) const
+{
+    static const QRegularExpression validKey(QStringLiteral("^[A-Za-z0-9_-]+$"));
+    if (!validKey.match(key).hasMatch())
+        return {};
+    // Public links always use the configured Immich URL, independently of
+    // the local endpoint selected for API traffic.
+    QUrl url(m_connection.serverUrl);
+    if (!url.isValid() || url.host().isEmpty() ||
+        (url.scheme() != QStringLiteral("https") && url.scheme() != QStringLiteral("http")))
+        return {};
+    QString path = url.path();
+    while (path.endsWith(u'/'))
+        path.chop(1);
+    if (path.endsWith(QStringLiteral("/api")))
+        path.chop(4);
+    url.setPath(path + QStringLiteral("/share/") + key);
+    url.setQuery(QString());
+    url.setFragment(QString());
+    url.setUserName(QString());
+    url.setPassword(QString());
+    return url;
+}
+
+void ImmichClient::createSharedLink(const QString &assetId, const QUuid &requestId)
+{
+    if (!isConfigured() || !isValidImmichId(assetId)) {
+        emit sharedLinkFailed(requestId, tr("Connect to Immich and choose an uploaded photo or video."));
+        return;
+    }
+    if (sharedLinkUrl(QStringLiteral("validate")).isEmpty()) {
+        emit sharedLinkFailed(requestId, tr("Set a valid Immich URL in server settings first."));
+        return;
+    }
+    if (!m_online) {
+        emit sharedLinkFailed(requestId, tr("You are offline. Connect to Immich to create a share link."));
+        return;
+    }
+    QJsonObject body{{QStringLiteral("type"), QStringLiteral("INDIVIDUAL")},
+                     {QStringLiteral("assetIds"), QJsonArray{assetId}},
+                     {QStringLiteral("allowUpload"), false},
+                     {QStringLiteral("allowDownload"), true},
+                     {QStringLiteral("showMetadata"), false}};
+    const QUrl publicBase = sharedLinkUrl(QStringLiteral("placeholder"));
+    auto request = authenticatedRequest(apiUrl(QStringLiteral("/shared-links")));
+    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+    request.setRawHeader("Accept", "application/json");
+    request.setTransferTimeout(20000);
+    auto *reply = m_network->post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
+    connect(reply, &QNetworkReply::finished, this, [this, reply, requestId, publicBase] {
+        const QByteArray response = reply->readAll();
+        if (reply->error() != QNetworkReply::NoError) {
+            emit sharedLinkFailed(requestId, errorMessage(reply, response));
+            reply->deleteLater();
+            return;
+        }
+        const QString key = QJsonDocument::fromJson(response).object().value(QStringLiteral("key")).toString();
+        static const QRegularExpression validKey(QStringLiteral("^[A-Za-z0-9_-]+$"));
+        if (!validKey.match(key).hasMatch()) {
+            emit sharedLinkFailed(requestId, tr("Immich returned an invalid share link."));
+        } else {
+            QUrl url = publicBase;
+            QString path = url.path();
+            path.chop(QStringLiteral("placeholder").size());
+            url.setPath(path + key);
+            emit sharedLinkCreated(requestId, url);
+        }
+        reply->deleteLater();
+    });
+}
+
 void ImmichClient::loadImageAsync(const QString &assetId, const QString &resultSize)
 {
     if (!ensureConfigured(tr("Load image")))

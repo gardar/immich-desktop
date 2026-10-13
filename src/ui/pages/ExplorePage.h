@@ -167,6 +167,7 @@ private:
     QLabel *m_previewTitle = nullptr;
     ZoomPanWidget *m_previewView = nullptr;
     QString m_previewAssetId;
+    ImmichAsset m_previewAsset;
     bool m_previewFromCollection = false;
 
     bool m_loadedOnce = false;

@@ -1,5 +1,6 @@
 #include "ui/widgets/VideoPlayerDialog.h"
 #include "ui/IconUtils.h"
+#include "ui/widgets/ShareLinkDialog.h"
 
 #include "ui/widgets/SoftwareVideoWidget.h"
 #include "ui/widgets/ZoomPanWidget.h"
@@ -75,6 +76,12 @@ VideoPlayerDialog::VideoPlayerDialog(ImmichClient *client, const ImmichAsset &as
     controls->addWidget(volumeLabel);
     controls->addWidget(m_volumeSlider);
     controls->addWidget(m_downloadButton);
+    auto *share = new QPushButton(tr("Share link"), this);
+    configureActionButton(share, QStringLiteral(":/icons/external-link.svg"));
+    controls->addWidget(share);
+    connect(share, &QPushButton::clicked, this, [this, client] {
+        (new ShareLinkDialog(client, m_asset, this))->show();
+    });
     controls->addWidget(m_trashButton);
     controls->addWidget(m_deleteButton);
 
