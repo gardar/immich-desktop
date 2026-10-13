@@ -66,7 +66,7 @@ public:
                        const QString &suggestedFileName = {});
     void fetchAssetOriginal(const QString &assetId);
     void deleteAssets(const QStringList &assetIds, bool permanent = false);
-    void createSharedLink(const QString &assetId, const QUuid &requestId);
+    void createSharedLink(const QString &assetId, const QUuid &requestId, const QString &password = {});
     QUrl sharedLinkUrl(const QString &key) const;
     bool isUploading() const;
     bool isDownloading() const;

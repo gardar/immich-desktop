@@ -4,6 +4,7 @@
 
 #include <QApplication>
 #include <QClipboard>
+#include <QCheckBox>
 #include <QDialogButtonBox>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -21,7 +22,7 @@ ShareLinkDialog::ShareLinkDialog(ImmichClient *client, const ImmichAsset &asset,
     setAttribute(Qt::WA_DeleteOnClose);
     setAttribute(Qt::WA_StyledBackground);
     setWindowTitle(tr("Share media"));
-    resize(600, 260);
+    resize(600, 340);
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(22, 20, 22, 20);
     layout->setSpacing(14);
@@ -36,6 +37,23 @@ ShareLinkDialog::ShareLinkDialog(ImmichClient *client, const ImmichAsset &asset,
     help->setWordWrap(true);
     help->setProperty("subheading", true);
     layout->addWidget(help);
+    auto *passwordLabel = new QLabel(tr("Password (optional)"), this);
+    m_password = new QLineEdit(this);
+    m_password->setObjectName(QStringLiteral("sharePasswordField"));
+    m_password->setAccessibleName(tr("Share link password"));
+    m_password->setEchoMode(QLineEdit::Password);
+    m_password->setPlaceholderText(tr("Leave empty to share without a password"));
+    passwordLabel->setBuddy(m_password);
+    layout->addWidget(passwordLabel);
+    auto *passwordRow = new QHBoxLayout;
+    m_showPassword = new QCheckBox(tr("Show password"), this);
+    m_showPassword->setObjectName(QStringLiteral("showSharePassword"));
+    passwordRow->addWidget(m_password, 1);
+    passwordRow->addWidget(m_showPassword);
+    layout->addLayout(passwordRow);
+    connect(m_showPassword, &QCheckBox::toggled, this, [this](bool show) {
+        m_password->setEchoMode(show ? QLineEdit::Normal : QLineEdit::Password);
+    });
     auto *row = new QHBoxLayout;
     m_link->setObjectName(QStringLiteral("sharedLinkField"));
     m_link->setReadOnly(true);
@@ -61,8 +79,11 @@ ShareLinkDialog::ShareLinkDialog(ImmichClient *client, const ImmichAsset &asset,
     connect(m_create, &QPushButton::clicked, this, [this] {
         m_requestId = QUuid::createUuid();
         m_create->setEnabled(false);
+        m_passwordProtected = !m_password->text().isEmpty();
+        m_password->setEnabled(false);
+        m_showPassword->setEnabled(false);
         m_status->setText(tr("Creating your share link…"));
-        m_client->createSharedLink(m_asset.id, m_requestId);
+        m_client->createSharedLink(m_asset.id, m_requestId, m_password->text());
     });
     connect(m_client, &ImmichClient::sharedLinkCreated, this, [this](const QUuid &id, const QUrl &url) {
         if (id != m_requestId)
@@ -70,19 +91,26 @@ ShareLinkDialog::ShareLinkDialog(ImmichClient *client, const ImmichAsset &asset,
         m_link->setText(url.toString(QUrl::FullyEncoded));
         m_copy->setEnabled(true);
         m_create->hide();
-        m_status->setText(tr("Link ready. Anyone with the link can view this media."));
+        m_password->setEnabled(true);
+        m_password->setReadOnly(true);
+        m_showPassword->setEnabled(true);
+        m_status->setText(m_passwordProtected ? tr("Link ready. A password is required to view this media.")
+            : tr("Link ready. Anyone with the link can view this media."));
     });
     connect(m_client, &ImmichClient::sharedLinkFailed, this, [this](const QUuid &id, const QString &message) {
         if (id != m_requestId)
             return;
         m_create->setEnabled(true);
+        m_password->setEnabled(true);
+        m_showPassword->setEnabled(true);
         m_status->setText(message);
     });
     connect(m_copy, &QPushButton::clicked, this, [this] {
         if (m_link->text().isEmpty())
             return;
         QApplication::clipboard()->setText(m_link->text());
-        m_status->setText(tr("Link copied to clipboard."));
+        m_status->setText(m_passwordProtected ? tr("Link copied. Share the password separately.")
+                                             : tr("Link copied to clipboard."));
     });
 }
 } // namespace Aurora

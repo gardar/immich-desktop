@@ -7,6 +7,7 @@
 class QLineEdit;
 class QLabel;
 class QPushButton;
+class QCheckBox;
 
 namespace Aurora {
 class ImmichClient;
@@ -21,6 +22,9 @@ private:
     ImmichAsset m_asset;
     QUuid m_requestId;
     QLineEdit *m_link;
+    QLineEdit *m_password = nullptr;
+    QCheckBox *m_showPassword = nullptr;
+    bool m_passwordProtected = false;
     QLabel *m_status;
     QPushButton *m_create;
     QPushButton *m_copy;

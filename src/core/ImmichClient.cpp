@@ -1562,7 +1562,7 @@ QUrl ImmichClient::sharedLinkUrl(const QString &key) const
     return url;
 }
 
-void ImmichClient::createSharedLink(const QString &assetId, const QUuid &requestId)
+void ImmichClient::createSharedLink(const QString &assetId, const QUuid &requestId, const QString &password)
 {
     if (!isConfigured() || !isValidImmichId(assetId)) {
         emit sharedLinkFailed(requestId, tr("Connect to Immich and choose an uploaded photo or video."));
@@ -1581,6 +1581,8 @@ void ImmichClient::createSharedLink(const QString &assetId, const QUuid &request
                      {QStringLiteral("allowUpload"), false},
                      {QStringLiteral("allowDownload"), true},
                      {QStringLiteral("showMetadata"), false}};
+    if (!password.isEmpty())
+        body.insert(QStringLiteral("password"), password);
     const QUrl publicBase = sharedLinkUrl(QStringLiteral("placeholder"));
     auto request = authenticatedRequest(apiUrl(QStringLiteral("/shared-links")));
     request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
