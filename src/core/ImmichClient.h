@@ -65,6 +65,7 @@ public:
     void downloadAsset(const QString &assetId, const QString &destinationPath,
                        const QString &suggestedFileName = {});
     void fetchAssetOriginal(const QString &assetId);
+    void fetchAssetInfo(const QString &assetId);
     void deleteAssets(const QStringList &assetIds, bool permanent = false);
     void createSharedLink(const QString &assetId, const QUuid &requestId, const QString &password = {});
     QUrl sharedLinkUrl(const QString &key) const;
@@ -99,6 +100,8 @@ signals:
     void uploadQueueChanged(int pendingCount);
     void downloadProgress(const QString &assetId, qint64 bytesReceived, qint64 bytesTotal);
     void assetDownloaded(const QString &assetId, const QString &destinationPath);
+    void assetInfoLoaded(const Aurora::ImmichAsset &asset);
+    void assetInfoFailed(const QString &assetId, const QString &message);
     void assetOriginalFetched(const QString &assetId, const QByteArray &bytes,
                               const QString &contentType);
     void assetsDeleted(const QStringList &assetIds, bool permanent);
