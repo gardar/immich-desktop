@@ -242,6 +242,9 @@ void MainWindow::closeEvent(QCloseEvent *event)
         return;
     }
     QMainWindow::closeEvent(event);
+    // setupTrayIcon() disables quit-on-last-window-closed, so quit explicitly.
+    if (event->isAccepted() && !m_forceQuit)
+        quitApplication();
 }
 
 void MainWindow::hideEvent(QHideEvent *event)
