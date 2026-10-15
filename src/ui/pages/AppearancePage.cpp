@@ -183,8 +183,10 @@ AppearancePage::AppearancePage(ThemeManager *themeManager, QWidget *parent)
     m_autoStart->setCursor(Qt::PointingHandCursor);
     const bool trayAvailable = QSystemTrayIcon::isSystemTrayAvailable();
     m_closeToTray->setEnabled(trayAvailable);
-    if (!trayAvailable)
-        m_closeToTray->setToolTip(tr("System tray is not available on this desktop."));
+    m_closeToTray->setToolTip(
+        trayAvailable
+            ? tr("Closing the window keeps immich running in the tray. Press Ctrl+Q to quit.")
+            : tr("System tray is not available on this desktop."));
     m_autoStart->setEnabled(AutoStart::isSupported());
     if (!AutoStart::isSupported())
         m_autoStart->setToolTip(tr("Autostart is not supported on this platform."));
