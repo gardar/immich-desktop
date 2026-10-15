@@ -48,6 +48,10 @@ struct TimelineSettings {
     bool compactGrid = false;
 };
 
+struct DownloadSettings {
+    QString lastDirectory;
+};
+
 struct FolderSyncSettings {
     bool enabled = false;
     bool localNetworkOnly = false;
@@ -80,6 +84,9 @@ public:
 
     TimelineSettings loadTimeline() const;
     void saveTimeline(const TimelineSettings &timeline);
+
+    DownloadSettings loadDownload() const;
+    void saveDownload(const DownloadSettings &download);
 
     FolderSyncSettings loadFolderSync() const;
     void saveFolderSync(const FolderSyncSettings &folderSync);

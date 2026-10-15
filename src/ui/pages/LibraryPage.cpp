@@ -1948,13 +1948,20 @@ void LibraryPage::promptDownload(const ImmichAsset &asset)
     const QString suggestedName =
         asset.fileName.isEmpty() ? QStringLiteral("immich-%1").arg(asset.id) : asset.fileName;
 
-    const QString downloads =
-        QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
+    AppSettings settings;
+    DownloadSettings download = settings.loadDownload();
+    QString directory = download.lastDirectory;
+    if (directory.isEmpty() || !QFileInfo(directory).isDir())
+        directory = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
+
     const QString path = QFileDialog::getSaveFileName(
-        this, tr("Download media"), QDir(downloads).filePath(suggestedName),
+        this, tr("Download media"), QDir(directory).filePath(suggestedName),
         mediaFileFilter());
     if (path.isEmpty())
         return;
+
+    download.lastDirectory = QFileInfo(path).absolutePath();
+    settings.saveDownload(download);
 
     m_status->setText(tr("Downloading %1…").arg(QFileInfo(path).fileName()));
     m_client->downloadAsset(asset.id, path, suggestedName);
