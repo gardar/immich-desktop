@@ -518,6 +518,10 @@ LibraryPage::LibraryPage(ImmichClient *client, FolderSyncService *folderSync,
             this, &LibraryPage::handleDownloadProgress);
     connect(m_client, &ImmichClient::assetDownloaded,
             this, &LibraryPage::handleAssetDownloaded);
+    connect(m_client, &ImmichClient::assetInfoLoaded,
+            this, &LibraryPage::handleAssetInfoLoaded);
+    connect(m_client, &ImmichClient::assetInfoFailed,
+            this, &LibraryPage::handleAssetInfoFailed);
     connect(m_client, &ImmichClient::assetOriginalFetched,
             this, &LibraryPage::handleAssetOriginalFetched);
     connect(m_client, &ImmichClient::assetsDeleted, this, &LibraryPage::handleAssetsDeleted);
@@ -1893,17 +1897,66 @@ void LibraryPage::downloadAsset(const ImmichAsset &asset)
     if (!m_client->isConfigured() || asset.id.isEmpty())
         return;
 
+    if (!asset.fileName.isEmpty()) {
+        promptDownload(asset);
+        return;
+    }
+
+    // Timeline buckets omit originalFileName, so look it up before suggesting a name.
+    m_downloadInfoPendingAssetId = asset.id;
+    m_status->setText(tr("Preparing download…"));
+    m_client->fetchAssetInfo(asset.id);
+}
+
+void LibraryPage::handleAssetInfoLoaded(const ImmichAsset &info)
+{
+    if (info.id.isEmpty() || info.fileName.isEmpty())
+        return;
+
+    for (ImmichAsset &asset : m_assets) {
+        if (asset.id == info.id) {
+            asset.fileName = info.fileName;
+            if (MediaTile *tile = m_tilesById.value(asset.id))
+                tile->updateAsset(asset);
+            break;
+        }
+    }
+    if (m_currentAsset.id == info.id)
+        m_currentAsset.fileName = info.fileName;
+
+    if (info.id != m_downloadInfoPendingAssetId)
+        return;
+    m_downloadInfoPendingAssetId.clear();
+    m_status->clear();
+    promptDownload(info);
+}
+
+void LibraryPage::handleAssetInfoFailed(const QString &assetId, const QString &message)
+{
+    Q_UNUSED(message);
+    if (assetId != m_downloadInfoPendingAssetId)
+        return;
+    m_downloadInfoPendingAssetId.clear();
+    m_status->clear();
+    ImmichAsset asset;
+    asset.id = assetId;
+    promptDownload(asset);
+}
+
+void LibraryPage::promptDownload(const ImmichAsset &asset)
+{
     const QString suggestedName =
         asset.fileName.isEmpty() ? QStringLiteral("immich-%1").arg(asset.id) : asset.fileName;
+
     const QString downloads =
         QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
     const QString path = QFileDialog::getSaveFileName(
-        this, tr("Download media"), QStringLiteral("%1/%2").arg(downloads, suggestedName),
+        this, tr("Download media"), QDir(downloads).filePath(suggestedName),
         mediaFileFilter());
     if (path.isEmpty())
         return;
 
-    m_status->setText(tr("Downloading %1…").arg(suggestedName));
+    m_status->setText(tr("Downloading %1…").arg(QFileInfo(path).fileName()));
     m_client->downloadAsset(asset.id, path, suggestedName);
 }
 

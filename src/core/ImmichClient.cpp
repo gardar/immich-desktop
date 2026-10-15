@@ -1419,6 +1419,30 @@ void ImmichClient::downloadAsset(const QString &assetId, const QString &destinat
             });
 }
 
+void ImmichClient::fetchAssetInfo(const QString &assetId)
+{
+    if (!isConfigured() || !isValidImmichId(assetId)) {
+        emit assetInfoFailed(assetId, tr("The asset identifier is invalid."));
+        return;
+    }
+
+    auto *reply =
+        m_network->get(authenticatedRequest(apiUrl(QStringLiteral("/assets/%1").arg(assetId))));
+    connect(reply, &QNetworkReply::finished, this, [this, reply, assetId] {
+        const QByteArray body = reply->readAll();
+        if (reply->error() != QNetworkReply::NoError) {
+            emit assetInfoFailed(assetId, errorMessage(reply, body));
+            reply->deleteLater();
+            return;
+        }
+        ImmichAsset asset = assetFromObject(QJsonDocument::fromJson(body).object());
+        if (asset.id.isEmpty())
+            asset.id = assetId;
+        emit assetInfoLoaded(asset);
+        reply->deleteLater();
+    });
+}
+
 void ImmichClient::fetchAssetOriginal(const QString &assetId)
 {
     if (!ensureConfigured(tr("Copy")))

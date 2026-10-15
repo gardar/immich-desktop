@@ -72,6 +72,8 @@ private slots:
     void showRequestError(const QString &operation, const QString &message);
     void openAsset(const Aurora::ImmichAsset &asset);
     void downloadAsset(const Aurora::ImmichAsset &asset);
+    void handleAssetInfoLoaded(const Aurora::ImmichAsset &asset);
+    void handleAssetInfoFailed(const QString &assetId, const QString &message);
     void copyAsset(const Aurora::ImmichAsset &asset);
     void pasteFromClipboard();
     void trashAsset(const Aurora::ImmichAsset &asset);
@@ -129,6 +131,7 @@ private:
     void animateSearchPanel(bool open);
     void updateSearchOptionsUi();
     ImmichAsset currentAssetForClipboard() const;
+    void promptDownload(const Aurora::ImmichAsset &asset);
     void confirmAndDelete(const Aurora::ImmichAsset &asset, bool permanent);
     void removeAssetsFromTimeline(const QStringList &assetIds);
     QStringList uploadableLocalPaths(const QList<QUrl> &urls) const;
@@ -233,6 +236,7 @@ private:
     QString m_newestAssetId;
     QString m_searchQuery;
     QString m_copyInFlightAssetId;
+    QString m_downloadInfoPendingAssetId;
     QSet<QString> m_pasteTempFiles;
     ImmichAsset m_currentAsset;
     int m_uploadsCompleted = 0;
