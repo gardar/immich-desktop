@@ -27,6 +27,7 @@
 #include <QPainterPath>
 #include <QRegion>
 #include <QResizeEvent>
+#include <QShortcut>
 #include <QShowEvent>
 #include <QSystemTrayIcon>
 #include <QTimer>
@@ -174,6 +175,10 @@ MainWindow::MainWindow(ThemeManager *themeManager, UpdateManager *updateManager,
     }
 
     setupTrayIcon();
+
+    auto *quitShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Q), this);
+    quitShortcut->setContext(Qt::ApplicationShortcut);
+    connect(quitShortcut, &QShortcut::activated, this, &MainWindow::quitApplication);
 }
 
 void MainWindow::setupTrayIcon()
