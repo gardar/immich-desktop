@@ -1919,8 +1919,12 @@ void LibraryPage::downloadAsset(const ImmichAsset &asset)
 
 void LibraryPage::handleAssetInfoLoaded(const ImmichAsset &info)
 {
-    if (info.id.isEmpty() || info.fileName.isEmpty())
+    if (info.id.isEmpty())
         return;
+    if (info.fileName.isEmpty()) {
+        handleAssetInfoFailed(info.id, QString());
+        return;
+    }
 
     for (ImmichAsset &asset : m_assets) {
         if (asset.id == info.id) {
