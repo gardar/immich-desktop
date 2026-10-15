@@ -213,6 +213,20 @@ void AppSettings::saveTimeline(const TimelineSettings &timeline)
     m_settings.sync();
 }
 
+DownloadSettings AppSettings::loadDownload() const
+{
+    DownloadSettings result;
+    result.lastDirectory =
+        m_settings.value(QStringLiteral("download/lastDirectory")).toString();
+    return result;
+}
+
+void AppSettings::saveDownload(const DownloadSettings &download)
+{
+    m_settings.setValue(QStringLiteral("download/lastDirectory"), download.lastDirectory);
+    m_settings.sync();
+}
+
 FolderSyncSettings AppSettings::loadFolderSync() const
 {
     FolderSyncSettings result;
