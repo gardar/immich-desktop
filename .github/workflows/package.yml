@@ -196,7 +196,9 @@ jobs:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         with:
           snap: ${{ steps.build.outputs.snap }}
-          release: stable
+          # Publish to every risk level so Ubuntu USN rebuilds clear
+          # edge/candidate/beta as well as stable.
+          release: stable,candidate,beta,edge
 
   release:
     name: Publish tagged release
