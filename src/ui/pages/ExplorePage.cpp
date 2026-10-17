@@ -337,6 +337,8 @@ ExplorePage::ExplorePage(ImmichClient *client, QWidget *parent)
     connect(m_client, &ImmichClient::thumbnailLoaded, this, &ExplorePage::showAssetThumbnail);
     connect(m_client, &ImmichClient::previewLoaded, this, &ExplorePage::showPreviewImage);
     connect(m_client, &ImmichClient::requestFailed, this, &ExplorePage::showRequestError);
+    connect(m_client, &ImmichClient::assetsDeleted, this,
+            [this](const QStringList &assetIds, bool) { handleAssetsDeleted(assetIds); });
     connect(m_client, &ImmichClient::configurationChanged, this, [this](bool configured) {
         m_refreshButton->setEnabled(configured);
         if (configured) {
@@ -666,6 +668,41 @@ void ExplorePage::showCollectionPage(const QString &title, const QString &subtit
 
     m_collectionLoadMore->setVisible(false);
     setPage(Page::Collection);
+}
+
+void ExplorePage::handleAssetsDeleted(const QStringList &assetIds)
+{
+    if (m_collectionHoverPreview)
+        m_collectionHoverPreview->stop();
+
+    for (const QString &assetId : assetIds) {
+        const QList<ExploreCard *> cards = m_browseAssetCards.values(assetId);
+        for (ExploreCard *card : cards) {
+            // Place cards are keyed by their sample photo too; keep them until refresh.
+            if (m_recentSection.cards.removeOne(card)) {
+                m_browseAssetCards.remove(assetId, card);
+                card->deleteLater();
+            }
+        }
+
+        const QPointer<MediaTile> tile = m_collectionTiles.take(assetId);
+        if (!tile)
+            continue;
+        for (DaySection &section : m_collectionSections)
+            section.tiles.removeAll(tile.data());
+        m_collectionRequestedThumbs.remove(assetId);
+        tile->deleteLater();
+    }
+
+    m_collectionSections.removeIf([](const DaySection &section) {
+        if (!section.tiles.isEmpty())
+            return false;
+        if (section.header)
+            section.header->deleteLater();
+        return true;
+    });
+    populateSection(&m_recentSection, !m_recentSection.cards.isEmpty());
+    scheduleCollectionLayout();
 }
 
 void ExplorePage::clearCollectionTimeline()

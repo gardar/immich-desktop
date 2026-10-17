@@ -75,6 +75,7 @@ private slots:
     void showAssetThumbnail(const QString &assetId, const QPixmap &thumbnail);
     void showPreviewImage(const QString &assetId, const QPixmap &preview);
     void showRequestError(const QString &operation, const QString &message);
+    void handleAssetsDeleted(const QStringList &assetIds);
     void openPerson(const Aurora::ImmichPerson &person);
     void openPlace(const Aurora::ImmichPlace &place);
     void openAsset(const Aurora::ImmichAsset &asset);
