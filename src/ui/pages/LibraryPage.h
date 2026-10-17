@@ -48,6 +48,12 @@ public:
                 FolderSyncService *folderSync, QWidget *parent = nullptr);
     void setCompactGrid(bool enabled);
 
+public slots:
+    void copyAsset(const Aurora::ImmichAsset &asset);
+    void downloadAsset(const Aurora::ImmichAsset &asset);
+    void trashAsset(const Aurora::ImmichAsset &asset);
+    void deleteAssetPermanently(const Aurora::ImmichAsset &asset);
+
 protected:
     void resizeEvent(QResizeEvent *event) override;
     void hideEvent(QHideEvent *event) override;
@@ -72,13 +78,9 @@ private slots:
                             const QString &message);
     void showRequestError(const QString &operation, const QString &message);
     void openAsset(const Aurora::ImmichAsset &asset);
-    void downloadAsset(const Aurora::ImmichAsset &asset);
     void handleAssetInfoLoaded(const Aurora::ImmichAsset &asset);
     void handleAssetInfoFailed(const QString &assetId, const QString &message);
-    void copyAsset(const Aurora::ImmichAsset &asset);
     void pasteFromClipboard();
-    void trashAsset(const Aurora::ImmichAsset &asset);
-    void deleteAssetPermanently(const Aurora::ImmichAsset &asset);
     void handleAssetsDeleted(const QStringList &assetIds, bool permanent);
     void handleUploadProgress(const QString &filePath, qint64 bytesSent, qint64 bytesTotal);
     void handleAssetUploaded(const QString &filePath, const QString &assetId, bool duplicate);

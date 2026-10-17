@@ -101,6 +101,8 @@ MediaViewerDialog::MediaViewerDialog(ThemeManager *themeManager, ImmichClient *c
     connect(m_client, &ImmichClient::timelineBucketLoaded, this,
             &MediaViewerDialog::updateNavigation);
     connect(m_client, &ImmichClient::assetsLoaded, this, &MediaViewerDialog::updateNavigation);
+    connect(m_client, &ImmichClient::filteredAssetsLoaded, this,
+            &MediaViewerDialog::updateNavigation);
 
     // Only the item opened from the grid autoplays; videos reached by browsing wait.
     setAsset(asset, asset.isVideo());

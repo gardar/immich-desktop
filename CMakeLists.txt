@@ -104,8 +104,6 @@ set(IMMICH_SOURCES
     src/ui/widgets/SoftwareVideoWidget.h
     src/ui/widgets/VideoHoverPreview.cpp
     src/ui/widgets/VideoHoverPreview.h
-    src/ui/widgets/VideoPlayerDialog.cpp
-    src/ui/widgets/VideoPlayerDialog.h
     src/ui/widgets/VideoPlayerWidget.cpp
     src/ui/widgets/VideoPlayerWidget.h
     src/ui/widgets/ZoomPanWidget.cpp
