@@ -34,6 +34,7 @@ class QTimer;
 
 namespace Aurora {
 
+class ThemeManager;
 class FolderSyncService;
 class MediaTile;
 class SummaryTile;
@@ -43,8 +44,8 @@ class LibraryPage final : public QWidget {
     Q_OBJECT
 
 public:
-    explicit LibraryPage(ImmichClient *client, FolderSyncService *folderSync,
-                         QWidget *parent = nullptr);
+    LibraryPage(ThemeManager *themeManager, ImmichClient *client,
+                FolderSyncService *folderSync, QWidget *parent = nullptr);
     void setCompactGrid(bool enabled);
 
 protected:
@@ -71,6 +72,7 @@ private slots:
                             const QString &message);
     void showRequestError(const QString &operation, const QString &message);
     void openAsset(const Aurora::ImmichAsset &asset);
+    void playVideo(const Aurora::ImmichAsset &asset);
     void downloadAsset(const Aurora::ImmichAsset &asset);
     void handleAssetInfoLoaded(const Aurora::ImmichAsset &asset);
     void handleAssetInfoFailed(const QString &assetId, const QString &message);
@@ -132,6 +134,7 @@ private:
     void updateSearchOptionsUi();
     ImmichAsset currentAssetForClipboard() const;
     void promptDownload(const Aurora::ImmichAsset &asset);
+    ImmichAsset adjacentAsset(const QString &assetId, int step);
     void confirmAndDelete(const Aurora::ImmichAsset &asset, bool permanent);
     void removeAssetsFromTimeline(const QStringList &assetIds);
     QStringList uploadableLocalPaths(const QList<QUrl> &urls) const;
@@ -161,6 +164,7 @@ private:
     void handleYearDetailBucketLoaded(int year, const QDate &month,
                                       const QList<ImmichAsset> &assets);
 
+    ThemeManager *m_themeManager;
     ImmichClient *m_client;
     FolderSyncService *m_folderSync = nullptr;
     QStackedWidget *m_contentStack;
