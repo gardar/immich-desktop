@@ -7,10 +7,12 @@
 #include <functional>
 
 class QPushButton;
+class QStackedWidget;
 
 namespace Aurora {
 
 class ThemeManager;
+class VideoPlayerWidget;
 class ZoomPanWidget;
 
 class MediaViewerDialog final : public QDialog {
@@ -27,14 +29,13 @@ public:
     void updateNavigation();
 
 signals:
-    void playRequested(const Aurora::ImmichAsset &asset);
     void copyRequested(const Aurora::ImmichAsset &asset);
     void downloadRequested(const Aurora::ImmichAsset &asset);
     void trashRequested(const Aurora::ImmichAsset &asset);
     void deleteRequested(const Aurora::ImmichAsset &asset);
 
 private:
-    void setAsset(const ImmichAsset &asset);
+    void setAsset(const ImmichAsset &asset, bool autoplay = false);
     void step(int direction);
     void handleAssetsDeleted(const QStringList &assetIds);
 
@@ -44,10 +45,11 @@ private:
     ImmichAsset m_previousAsset;
     ImmichAsset m_nextAsset;
     int m_lastDirection = 1;
+    QStackedWidget *m_stack;
     ZoomPanWidget *m_preview;
+    VideoPlayerWidget *m_videoPlayer;
     QPushButton *m_previousButton;
     QPushButton *m_nextButton;
-    QPushButton *m_playButton;
     QPushButton *m_copyButton;
 };
 

@@ -2,12 +2,14 @@
 
 #include "ui/widgets/AnimatedButton.h"
 #include "ui/widgets/ShareLinkDialog.h"
+#include "ui/widgets/VideoPlayerWidget.h"
 #include "ui/widgets/ZoomPanWidget.h"
 
 #include <QHBoxLayout>
 #include <QKeySequence>
 #include <QPushButton>
 #include <QShortcut>
+#include <QStackedWidget>
 #include <QVBoxLayout>
 
 namespace Aurora {
@@ -18,13 +20,17 @@ MediaViewerDialog::MediaViewerDialog(ThemeManager *themeManager, ImmichClient *c
     : QDialog(parent)
     , m_client(client)
     , m_neighbors(std::move(neighbors))
+    , m_stack(new QStackedWidget(this))
     , m_preview(new ZoomPanWidget(this))
+    , m_videoPlayer(new VideoPlayerWidget(client, this))
 {
     setAttribute(Qt::WA_DeleteOnClose);
     setAttribute(Qt::WA_StyledBackground, true);
     resize(960, 700);
 
     m_preview->setMinimumSize(480, 320);
+    m_stack->addWidget(m_preview);
+    m_stack->addWidget(m_videoPlayer);
 
     auto makeButton = [this, themeManager](const QString &label, const QString &icon) {
         auto *button = new AnimatedButton(label, icon, themeManager, this);
@@ -34,7 +40,6 @@ MediaViewerDialog::MediaViewerDialog(ThemeManager *themeManager, ImmichClient *c
     };
     m_previousButton = makeButton({}, QStringLiteral(":/icons/chevron-left.svg"));
     m_nextButton = makeButton({}, QStringLiteral(":/icons/chevron-right.svg"));
-    m_playButton = makeButton(tr("Play"), QStringLiteral(":/icons/play.svg"));
     m_copyButton = makeButton(tr("Copy"), QStringLiteral(":/icons/copy.svg"));
     auto *downloadButton = makeButton(tr("Download"), QStringLiteral(":/icons/download.svg"));
     auto *shareButton = makeButton(tr("Share link"), QStringLiteral(":/icons/external-link.svg"));
@@ -44,13 +49,11 @@ MediaViewerDialog::MediaViewerDialog(ThemeManager *themeManager, ImmichClient *c
     auto *closeButton = makeButton(tr("Close"), QStringLiteral(":/icons/x.svg"));
     m_previousButton->setToolTip(tr("Previous (Left arrow)"));
     m_nextButton->setToolTip(tr("Next (Right arrow)"));
-    m_playButton->setToolTip(tr("Play video"));
 
     auto *controls = new QHBoxLayout;
     controls->addWidget(m_previousButton);
     controls->addWidget(m_nextButton);
     controls->addStretch(1);
-    controls->addWidget(m_playButton);
     controls->addWidget(m_copyButton);
     controls->addWidget(downloadButton);
     controls->addWidget(shareButton);
@@ -59,12 +62,11 @@ MediaViewerDialog::MediaViewerDialog(ThemeManager *themeManager, ImmichClient *c
     controls->addWidget(closeButton);
 
     auto *layout = new QVBoxLayout(this);
-    layout->addWidget(m_preview, 1);
+    layout->addWidget(m_stack, 1);
     layout->addLayout(controls);
 
     connect(m_previousButton, &QPushButton::clicked, this, [this] { step(-1); });
     connect(m_nextButton, &QPushButton::clicked, this, [this] { step(1); });
-    connect(m_playButton, &QPushButton::clicked, this, [this] { emit playRequested(m_asset); });
     connect(m_copyButton, &QPushButton::clicked, this, [this] { emit copyRequested(m_asset); });
     connect(downloadButton, &QPushButton::clicked, this,
             [this] { emit downloadRequested(m_asset); });
@@ -82,7 +84,11 @@ MediaViewerDialog::MediaViewerDialog(ThemeManager *themeManager, ImmichClient *c
 
     connect(m_client, &ImmichClient::previewLoaded, this,
             [this](const QString &assetId, const QPixmap &pixmap) {
-                if (assetId == m_asset.id)
+                if (assetId != m_asset.id)
+                    return;
+                if (m_asset.isVideo())
+                    m_videoPlayer->setPoster(pixmap);
+                else
                     m_preview->setPixmap(pixmap);
             });
     connect(m_client, &ImmichClient::imageLoadFailed, this,
@@ -96,7 +102,8 @@ MediaViewerDialog::MediaViewerDialog(ThemeManager *themeManager, ImmichClient *c
             &MediaViewerDialog::updateNavigation);
     connect(m_client, &ImmichClient::assetsLoaded, this, &MediaViewerDialog::updateNavigation);
 
-    setAsset(asset);
+    // Only the item opened from the grid autoplays; videos reached by browsing wait.
+    setAsset(asset, asset.isVideo());
 }
 
 void MediaViewerDialog::updateNavigation()
@@ -111,14 +118,20 @@ void MediaViewerDialog::updateNavigation()
         m_client->loadPreview(ahead.id);
 }
 
-void MediaViewerDialog::setAsset(const ImmichAsset &asset)
+void MediaViewerDialog::setAsset(const ImmichAsset &asset, bool autoplay)
 {
     m_asset = asset;
     setWindowTitle(asset.fileName.isEmpty() ? tr("Media preview") : asset.fileName);
-    m_playButton->setVisible(asset.isVideo());
     m_copyButton->setVisible(!asset.isVideo());
-    m_preview->setPixmap({});
-    m_preview->setPlaceholderText(tr("Loading preview…"));
+    if (asset.isVideo()) {
+        m_videoPlayer->setAsset(asset, autoplay);
+        m_stack->setCurrentWidget(m_videoPlayer);
+    } else {
+        m_videoPlayer->stop();
+        m_preview->setPixmap({});
+        m_preview->setPlaceholderText(tr("Loading preview…"));
+        m_stack->setCurrentWidget(m_preview);
+    }
     m_client->loadPreview(asset.id);
     updateNavigation();
 }

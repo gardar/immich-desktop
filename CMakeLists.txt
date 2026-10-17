@@ -106,6 +106,8 @@ set(IMMICH_SOURCES
     src/ui/widgets/VideoHoverPreview.h
     src/ui/widgets/VideoPlayerDialog.cpp
     src/ui/widgets/VideoPlayerDialog.h
+    src/ui/widgets/VideoPlayerWidget.cpp
+    src/ui/widgets/VideoPlayerWidget.h
     src/ui/widgets/ZoomPanWidget.cpp
     src/ui/widgets/ZoomPanWidget.h
     resources/resources.qrc

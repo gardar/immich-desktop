@@ -72,7 +72,6 @@ private slots:
                             const QString &message);
     void showRequestError(const QString &operation, const QString &message);
     void openAsset(const Aurora::ImmichAsset &asset);
-    void playVideo(const Aurora::ImmichAsset &asset);
     void downloadAsset(const Aurora::ImmichAsset &asset);
     void handleAssetInfoLoaded(const Aurora::ImmichAsset &asset);
     void handleAssetInfoFailed(const QString &assetId, const QString &message);

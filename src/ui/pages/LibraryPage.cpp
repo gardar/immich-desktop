@@ -8,7 +8,6 @@
 #include "ui/widgets/ShareLinkDialog.h"
 #include "ui/widgets/SummaryTile.h"
 #include "ui/widgets/VideoHoverPreview.h"
-#include "ui/widgets/VideoPlayerDialog.h"
 #include "ui/widgets/ZoomPanWidget.h"
 
 #include <QDesktopServices>
@@ -1825,39 +1824,19 @@ void LibraryPage::openAsset(const ImmichAsset &asset)
             QDesktopServices::openUrl(QUrl::fromLocalFile(asset.localPath));
         return;
     }
-    if (asset.isVideo()) {
-        playVideo(asset);
-        return;
-    }
+    if (asset.isVideo() && m_videoHoverPreview)
+        m_videoHoverPreview->stop();
 
     auto *viewer = new MediaViewerDialog(
         m_themeManager, m_client, asset,
         [this](const QString &assetId, int step) { return adjacentAsset(assetId, step); },
         this);
-    connect(viewer, &MediaViewerDialog::playRequested, this, &LibraryPage::playVideo);
     connect(viewer, &MediaViewerDialog::copyRequested, this, &LibraryPage::copyAsset);
     connect(viewer, &MediaViewerDialog::downloadRequested, this, &LibraryPage::downloadAsset);
     connect(viewer, &MediaViewerDialog::trashRequested, this, &LibraryPage::trashAsset);
     connect(viewer, &MediaViewerDialog::deleteRequested, this,
             &LibraryPage::deleteAssetPermanently);
     viewer->show();
-}
-
-void LibraryPage::playVideo(const ImmichAsset &asset)
-{
-    if (m_videoHoverPreview)
-        m_videoHoverPreview->stop();
-    auto *player = new VideoPlayerDialog(m_client, asset, this);
-    connect(player, &VideoPlayerDialog::downloadRequested, this, &LibraryPage::downloadAsset);
-    connect(player, &VideoPlayerDialog::trashRequested, this, &LibraryPage::trashAsset);
-    connect(player, &VideoPlayerDialog::deleteRequested, this,
-            &LibraryPage::deleteAssetPermanently);
-    connect(m_client, &ImmichClient::assetsDeleted, player,
-            [player, id = asset.id](const QStringList &ids, bool) {
-                if (ids.contains(id))
-                    player->close();
-            });
-    player->show();
 }
 
 ImmichAsset LibraryPage::adjacentAsset(const QString &assetId, int step)
