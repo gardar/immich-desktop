@@ -174,6 +174,8 @@ WindowSettings AppSettings::loadWindow() const
         m_settings.value(QStringLiteral("window/closeToTray"), true).toBool();
     result.autoStart =
         m_settings.value(QStringLiteral("window/autoStart"), false).toBool();
+    result.sidebarCollapsed =
+        m_settings.value(QStringLiteral("window/sidebarCollapsed"), false).toBool();
     return result;
 }
 
@@ -181,6 +183,7 @@ void AppSettings::saveWindow(const WindowSettings &window)
 {
     m_settings.setValue(QStringLiteral("window/closeToTray"), window.closeToTray);
     m_settings.setValue(QStringLiteral("window/autoStart"), window.autoStart);
+    m_settings.setValue(QStringLiteral("window/sidebarCollapsed"), window.sidebarCollapsed);
     m_settings.sync();
 }
 

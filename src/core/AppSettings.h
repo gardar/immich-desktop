@@ -38,6 +38,7 @@ struct ImmichConnectionSettings {
 struct WindowSettings {
     bool closeToTray = true;
     bool autoStart = false;
+    bool sidebarCollapsed = false;
 };
 
 struct PlaybackSettings {

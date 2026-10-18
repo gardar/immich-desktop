@@ -18,6 +18,8 @@ public:
     qreal hoverProgress() const;
     void setHoverProgress(qreal progress);
     QSize sizeHint() const override;
+    void setIconOnly(bool iconOnly);
+    void setIconResource(const QString &iconResource);
 
 protected:
     void enterEvent(QEnterEvent *event) override;
@@ -30,6 +32,7 @@ private:
     QString m_iconResource;
     ThemeManager *m_themeManager;
     qreal m_hoverProgress = 0.0;
+    bool m_iconOnly = false;
 };
 
 } // namespace Aurora

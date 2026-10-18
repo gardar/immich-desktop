@@ -37,6 +37,8 @@
         <file alias="icons/minus.svg">icons/minus.svg</file>
         <file alias="icons/plus.svg">icons/plus.svg</file>
         <file alias="icons/palette.svg">icons/palette.svg</file>
+        <file alias="icons/panel-left-close.svg">icons/panel-left-close.svg</file>
+        <file alias="icons/panel-left-open.svg">icons/panel-left-open.svg</file>
         <file alias="icons/play.svg">icons/play.svg</file>
         <file alias="icons/refresh-cw.svg">icons/refresh-cw.svg</file>
         <file alias="icons/settings.svg">icons/settings.svg</file>
@@ -68,6 +70,8 @@
         <file alias="icons/tabler/minus.svg">icons/tabler/minus.svg</file>
         <file alias="icons/tabler/plus.svg">icons/tabler/plus.svg</file>
         <file alias="icons/tabler/palette.svg">icons/tabler/palette.svg</file>
+        <file alias="icons/tabler/panel-left-close.svg">icons/tabler/panel-left-close.svg</file>
+        <file alias="icons/tabler/panel-left-open.svg">icons/tabler/panel-left-open.svg</file>
         <file alias="icons/tabler/play.svg">icons/tabler/play.svg</file>
         <file alias="icons/tabler/refresh-cw.svg">icons/tabler/refresh-cw.svg</file>
         <file alias="icons/tabler/save.svg">icons/tabler/save.svg</file>
