@@ -44,6 +44,11 @@ bool MediaTile::hasThumbnail() const
     return !m_thumbnail.isNull();
 }
 
+int MediaTile::thumbnailDimension() const
+{
+    return qMax(m_thumbnail.width(), m_thumbnail.height());
+}
+
 bool MediaTile::hasThumbnailError() const
 {
     return m_hasError;
@@ -64,6 +69,9 @@ void MediaTile::endHoverPreview()
 
 void MediaTile::setThumbnail(const QPixmap &thumbnail)
 {
+    // A late small thumbnail must not replace a sharper image loaded for zoom.
+    if (qMax(thumbnail.width(), thumbnail.height()) < thumbnailDimension())
+        return;
     m_thumbnail = thumbnail;
     if (thumbnail.height() > 0)
         m_resolvedAspectRatio = qreal(thumbnail.width()) / qreal(thumbnail.height());

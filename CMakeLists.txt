@@ -60,6 +60,7 @@ set(IMMICH_SOURCES
     src/ui/AppIcon.h
     src/ui/FontLoader.cpp
     src/ui/FontLoader.h
+    src/ui/GridZoom.h
     src/ui/IconUtils.cpp
     src/ui/IconUtils.h
     src/ui/MainWindow.cpp
@@ -108,6 +109,8 @@ set(IMMICH_SOURCES
     src/ui/widgets/VideoPlayerWidget.h
     src/ui/widgets/ZoomPanWidget.cpp
     src/ui/widgets/ZoomPanWidget.h
+    src/ui/widgets/ZoomSlider.cpp
+    src/ui/widgets/ZoomSlider.h
     resources/resources.qrc
 )
 

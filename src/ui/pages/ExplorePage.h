@@ -30,6 +30,7 @@ namespace Aurora {
 class ThemeManager;
 class MediaTile;
 class VideoHoverPreview;
+class ZoomSlider;
 
 class ExploreCard final : public QFrame {
     Q_OBJECT
@@ -116,6 +117,7 @@ private:
     void updateCollectionLoadMore(const QString &nextPage);
     ImmichAsset adjacentAsset(bool fromCollection, const QString &assetId, int step);
     void setPage(Page page);
+    void setCollectionTileSize(int size);
     void setCollectionHero(const QPixmap &thumb, bool personStyle);
     void scheduleCollectionLayout();
     void scheduleCollectionVisibility();
@@ -158,6 +160,7 @@ private:
     QList<DaySection> m_collectionSections;
     QHash<QString, QPointer<MediaTile>> m_collectionTiles;
     QSet<QString> m_collectionRequestedThumbs;
+    QHash<QString, int> m_collectionRequestedTileImages;
     QString m_collectionFilterKind;
     QString m_collectionFilterValue;
     QString m_collectionHeroAssetId;
@@ -167,6 +170,8 @@ private:
     bool m_collectionLoadingMore = false;
     bool m_collectionPersonStyle = false;
     bool m_collectionCompactGrid = false;
+    int m_collectionTileSize = 180;
+    ZoomSlider *m_collectionZoomSlider = nullptr;
 
     bool m_loadedOnce = false;
     bool m_loading = false;

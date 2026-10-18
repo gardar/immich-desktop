@@ -46,6 +46,7 @@ struct PlaybackSettings {
 
 struct TimelineSettings {
     bool compactGrid = false;
+    int tileSize = 180;
 };
 
 struct DownloadSettings {

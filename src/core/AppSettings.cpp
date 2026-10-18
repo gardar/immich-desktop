@@ -204,12 +204,15 @@ TimelineSettings AppSettings::loadTimeline() const
     TimelineSettings result;
     result.compactGrid =
         m_settings.value(QStringLiteral("timeline/compactGrid"), false).toBool();
+    result.tileSize =
+        m_settings.value(QStringLiteral("timeline/tileSize"), result.tileSize).toInt();
     return result;
 }
 
 void AppSettings::saveTimeline(const TimelineSettings &timeline)
 {
     m_settings.setValue(QStringLiteral("timeline/compactGrid"), timeline.compactGrid);
+    m_settings.setValue(QStringLiteral("timeline/tileSize"), timeline.tileSize);
     m_settings.sync();
 }
 

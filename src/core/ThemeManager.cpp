@@ -175,6 +175,14 @@ QString ThemeManager::buildStyleSheet() const
             font-size: 12.75pt;
         }
         QPushButton[windowControl="true"]:hover { background: %6; }
+        QPushButton[zoomButton="true"] {
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            padding: 6px;
+            min-width: 0;
+        }
+        QPushButton[zoomButton="true"]:hover { background: %6; }
         QPushButton#closeButton:hover { background: #E5484D; color: white; }
         QPushButton#videoOverlayButton {
             background: rgba(0, 0, 0, 140);
@@ -282,6 +290,7 @@ QString ThemeManager::buildStyleSheet() const
             background: %3; color: %1; border: 1px solid %4;
             border-radius: 6px; padding: 6px;
         }
+        QSlider:horizontal { min-height: 20px; }
         QSlider::groove:horizontal {
             height: 6px;
             background: %6;
@@ -291,7 +300,7 @@ QString ThemeManager::buildStyleSheet() const
         QSlider::handle:horizontal {
             width: 16px;
             height: 16px;
-            margin: -6px 0;
+            margin: -5px 0;
             background: %7;
             border-radius: 8px;
         }

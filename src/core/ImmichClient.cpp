@@ -1049,6 +1049,15 @@ void ImmichClient::loadPreview(const QString &assetId)
     loadImageAsync(assetId, QStringLiteral("preview"));
 }
 
+void ImmichClient::loadTileImage(const QString &assetId, int maximumDimension)
+{
+    if (maximumDimension <= 256) {
+        loadThumbnail(assetId);
+        return;
+    }
+    loadImageAsync(assetId, QStringLiteral("tile:%1").arg(maximumDimension));
+}
+
 bool ImmichClient::isUploading() const
 {
     return m_uploadInFlight || !m_uploadQueue.isEmpty();
@@ -1653,7 +1662,12 @@ void ImmichClient::loadImageAsync(const QString &assetId, const QString &resultS
     const QString serverUrl = activeServerUrl();
     QPointer<ImmichClient> self(this);
 
-    m_imagePool.start([this, self, assetId, resultSize, pendingKey, connection, serverUrl] {
+    const bool tileImage = resultSize.startsWith(QStringLiteral("tile:"));
+    const int tileDimension = tileImage ? resultSize.mid(5).toInt() : 0;
+    const bool usesPreview = tileImage || resultSize == QStringLiteral("preview");
+
+    m_imagePool.start([this, self, assetId, resultSize, pendingKey, connection, serverUrl,
+                       tileImage, tileDimension, usesPreview] {
         auto finishFail = [self, assetId, resultSize, pendingKey](const QString &message) {
             if (!self)
                 return;
@@ -1696,6 +1710,9 @@ void ImmichClient::loadImageAsync(const QString &assetId, const QString &resultS
                     if (resultSize == QStringLiteral("thumbnail")) {
                         self->m_thumbnailCache.store(assetId, cacheBytes, pixmap);
                         emit self->thumbnailLoaded(assetId, pixmap);
+                    } else if (resultSize.startsWith(QStringLiteral("tile:"))) {
+                        self->m_previewCache.store(assetId, cacheBytes, pixmap);
+                        emit self->thumbnailLoaded(assetId, pixmap);
                     } else {
                         if (resultSize == QStringLiteral("preview"))
                             self->m_previewCache.store(assetId, cacheBytes, pixmap);
@@ -1721,10 +1738,11 @@ void ImmichClient::loadImageAsync(const QString &assetId, const QString &resultS
                     return;
                 }
             }
-        } else if (resultSize == QStringLiteral("preview")) {
+        } else if (usesPreview) {
             const QByteArray cachedBytes = self->m_previewCache.readDisk(assetId);
             if (!cachedBytes.isEmpty()) {
-                const QImage image = self->decodeImage(cachedBytes, 1920);
+                const QImage image =
+                    self->decodeImage(cachedBytes, tileImage ? tileDimension : 1920);
                 if (!image.isNull()) {
                     finishImage(image, QByteArray());
                     return;
@@ -1798,17 +1816,19 @@ void ImmichClient::loadImageAsync(const QString &assetId, const QString &resultS
             return body;
         };
 
-        QByteArray bytes = fetchSize(resultSize == QStringLiteral("preview")
-                                         ? QStringLiteral("preview")
-                                         : QStringLiteral("thumbnail"),
+        QByteArray bytes = fetchSize(usesPreview ? QStringLiteral("preview")
+                                                 : QStringLiteral("thumbnail"),
                                      true);
         if (bytes.isEmpty())
             return;
 
         // Keep timeline thumbnails small so main-thread QPixmap conversion stays cheap.
-        const int maximumDimension =
-            resultSize == QStringLiteral("thumbnail") ? 256 : 1920;
+        const int maximumDimension = resultSize == QStringLiteral("thumbnail") ? 256
+                                     : tileImage                            ? tileDimension
+                                                                            : 1920;
         QImage image = decodeImage(bytes, maximumDimension);
+        // Tile images cache the server preview itself so the viewer can reuse it.
+        const QByteArray previewBytes = tileImage && !image.isNull() ? bytes : QByteArray();
         if (image.isNull()) {
             bytes = fetchSize(QStringLiteral("fullsize"), true);
             if (bytes.isEmpty())
@@ -1824,6 +1844,8 @@ void ImmichClient::loadImageAsync(const QString &assetId, const QString &resultS
         QByteArray cacheBytes;
         if (resultSize == QStringLiteral("thumbnail") || resultSize == QStringLiteral("preview"))
             cacheBytes = encodeThumbnail(image);
+        else if (tileImage)
+            cacheBytes = previewBytes;
         finishImage(image, cacheBytes);
     });
 }
