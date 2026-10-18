@@ -1,4 +1,4 @@
 {
-    "version":  "0.2.2",
-    "what_changed":  "Security rebuild against Ubuntu USN-8932-1 (libcurl3t64-gnutls).\n\n• Rebuilt amd64 and arm64 snaps so staged Ubuntu packages pick up the curl security updates\n• Republish to stable, candidate, beta, and edge so older vulnerable revisions leave those channels\n• No application feature changes required for this USN"
+  "version": "0.2.2",
+  "what_changed": "Viewer: step through photos and videos in Library and Explore with on-screen controls or arrow keys (PR #7).\n• Videos play inside the shared viewer; the opened item autoplays, browsed videos wait for play\n• Explore gains the same Copy/Download/Share/Trash/Delete actions; deleted items leave Explore lists\n• Viewer buttons match the sidebar style\n\nSecurity rebuild against Ubuntu USN-8932-1 (libcurl3t64-gnutls).\n• Rebuilt amd64 and arm64 snaps so staged Ubuntu packages pick up the curl security updates\n• Republish to stable, candidate, beta, and edge so older vulnerable revisions leave those channels\n\nAlso in the v0.2.2 packages:\n• PR #5: suggest original filenames when downloading and remember the last save folder\n• PR #6: quit on window close when Close to tray is off, plus Ctrl+Q to quit\n• Share links with optional password protection"
 }
