@@ -7,6 +7,7 @@
 #include <QPushButton>
 #include <QSignalBlocker>
 #include <QSlider>
+#include <QVariant>
 
 namespace Aurora {
 
@@ -17,7 +18,8 @@ ZoomSlider::ZoomSlider(QWidget *parent)
     auto *zoomOut = new QPushButton(this);
     auto *zoomIn = new QPushButton(this);
     for (QPushButton *button : {zoomOut, zoomIn}) {
-        button->setProperty("zoomButton", true);
+        // Explicit QVariant: older Qt (e.g. 6.4 on Ubuntu CI) rejects bool here.
+        button->setProperty("zoomButton", QVariant(true));
         button->setCursor(Qt::PointingHandCursor);
         button->setFocusPolicy(Qt::NoFocus);
     }
