@@ -40,9 +40,22 @@ void AnimatedButton::setHoverProgress(qreal progress)
 
 QSize AnimatedButton::sizeHint() const
 {
-    if (m_themeManager->minimalistUi() || text().isEmpty())
+    if (m_themeManager->minimalistUi() || m_iconOnly || text().isEmpty())
         return QSize(44, 44);
     return QSize(46 + fontMetrics().horizontalAdvance(text()) + 14, 44);
+}
+
+void AnimatedButton::setIconOnly(bool iconOnly)
+{
+    m_iconOnly = iconOnly;
+    updateGeometry();
+    update();
+}
+
+void AnimatedButton::setIconResource(const QString &iconResource)
+{
+    m_iconResource = iconResource;
+    update();
 }
 
 void AnimatedButton::enterEvent(QEnterEvent *event)
@@ -88,7 +101,7 @@ void AnimatedButton::paintEvent(QPaintEvent *)
     const QColor iconColor = isChecked() ? QColor(Qt::white) : theme.mutedText;
     const QPixmap icon = renderSvgIcon(m_iconResource, iconColor, QSize(19, 19),
                                        devicePixelRatioF());
-    const bool minimal = m_themeManager->minimalistUi() || text().isEmpty();
+    const bool minimal = m_themeManager->minimalistUi() || m_iconOnly || text().isEmpty();
     painter.drawPixmap(QRect(minimal ? (width() - 19) / 2 : 15, (height() - 19) / 2, 19, 19), icon);
     if (!minimal)
         painter.drawText(rect().adjusted(46, 0, -10, 0), Qt::AlignVCenter | Qt::AlignLeft, text());

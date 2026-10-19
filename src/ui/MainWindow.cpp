@@ -187,6 +187,9 @@ MainWindow::MainWindow(ThemeManager *themeManager, UpdateManager *updateManager,
     auto *quitShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Q), this);
     quitShortcut->setContext(Qt::ApplicationShortcut);
     connect(quitShortcut, &QShortcut::activated, this, &MainWindow::quitApplication);
+
+    auto *sidebarShortcut = new QShortcut(QKeySequence(Qt::Key_F9), this);
+    connect(sidebarShortcut, &QShortcut::activated, m_sidebar, &Sidebar::toggleCollapsed);
 }
 
 void MainWindow::setupTrayIcon()
@@ -481,6 +484,8 @@ void MainWindow::changeEvent(QEvent *event)
 void MainWindow::resizeEvent(QResizeEvent *event)
 {
     QMainWindow::resizeEvent(event);
+    constexpr int kSidebarAutoCollapseWidth = 1000;
+    m_sidebar->setNarrow(width() < kSidebarAutoCollapseWidth);
     if (isVisible()) {
         applyWindowCorners();
         updateResizeHandles();

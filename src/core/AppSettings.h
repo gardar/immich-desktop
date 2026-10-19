@@ -38,6 +38,7 @@ struct ImmichConnectionSettings {
 struct WindowSettings {
     bool closeToTray = true;
     bool autoStart = false;
+    bool sidebarCollapsed = false;
 };
 
 struct PlaybackSettings {
@@ -46,6 +47,7 @@ struct PlaybackSettings {
 
 struct TimelineSettings {
     bool compactGrid = false;
+    int tileSize = 180;
 };
 
 struct DownloadSettings {

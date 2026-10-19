@@ -39,6 +39,7 @@ class FolderSyncService;
 class MediaTile;
 class SummaryTile;
 class VideoHoverPreview;
+class ZoomSlider;
 
 class LibraryPage final : public QWidget {
     Q_OBJECT
@@ -47,6 +48,7 @@ public:
     LibraryPage(ThemeManager *themeManager, ImmichClient *client,
                 FolderSyncService *folderSync, QWidget *parent = nullptr);
     void setCompactGrid(bool enabled);
+    void setTileSize(int size);
 
 public slots:
     void copyAsset(const Aurora::ImmichAsset &asset);
@@ -131,6 +133,7 @@ private:
     bool isSearchFieldFocused() const;
     QJsonObject searchOptions() const;
     void updateSearchExpansion();
+    void updateToolbarDensity();
     void animateSearchPanel(bool open);
     void updateSearchOptionsUi();
     ImmichAsset currentAssetForClipboard() const;
@@ -178,6 +181,7 @@ private:
     QLabel *m_yearDetailStatus;
     QLabel *m_yearGridEmptyState;
     VideoHoverPreview *m_videoHoverPreview = nullptr;
+    QLabel *m_heading = nullptr;
     QLabel *m_status;
     QLabel *m_emptyState;
     QLabel *m_dropOverlay;
@@ -216,6 +220,7 @@ private:
     QHash<QString, MediaTile *> m_tilesById;
     QSet<QString> m_localAssetIds;
     QSet<QString> m_requestedThumbnails;
+    QHash<QString, int> m_requestedTileImages;
     QList<ImmichAsset> m_assets;
     QList<TimeBucketInfo> m_monthBuckets;
     int m_nextBucketIndex = 0;
@@ -253,6 +258,8 @@ private:
     bool m_dropActive = false;
     bool m_showingCached = false;
     bool m_compactGrid = false;
+    int m_tileSize = 180;
+    ZoomSlider *m_zoomSlider = nullptr;
 };
 
 } // namespace Aurora

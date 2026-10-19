@@ -1,11 +1,13 @@
 #include "ui/pages/ExplorePage.h"
 
 #include "core/AppSettings.h"
+#include "ui/GridZoom.h"
 #include "ui/IconUtils.h"
 #include "ui/widgets/MediaTile.h"
 #include "ui/widgets/MediaViewerDialog.h"
 #include "ui/widgets/ShareLinkDialog.h"
 #include "ui/widgets/VideoHoverPreview.h"
+#include "ui/widgets/ZoomSlider.h"
 
 #include <QFrame>
 #include <QHBoxLayout>
@@ -20,19 +22,18 @@
 #include <QResizeEvent>
 #include <QScrollArea>
 #include <QScrollBar>
+#include <QShortcut>
 #include <QShowEvent>
 #include <QStackedWidget>
 #include <QTimer>
 #include <QVBoxLayout>
+#include <QWheelEvent>
 
 namespace Aurora {
 
 namespace {
 constexpr int kSidePad = 16;
 constexpr int kGap = 4;
-constexpr int kTargetRowHeight = 220;
-constexpr int kMinRowHeight = 140;
-constexpr int kMaxRowHeight = 320;
 
 QPixmap circularPixmap(const QPixmap &source, const QSize &size)
 {
@@ -138,6 +139,7 @@ ExplorePage::ExplorePage(ThemeManager *themeManager, ImmichClient *client, QWidg
     , m_client(client)
     , m_stack(new QStackedWidget(this))
     , m_collectionCompactGrid(AppSettings().loadTimeline().compactGrid)
+    , m_collectionTileSize(GridZoom::clamp(AppSettings().loadTimeline().tileSize))
 {
     setObjectName(QStringLiteral("explorePage"));
 
@@ -252,6 +254,14 @@ ExplorePage::ExplorePage(ThemeManager *themeManager, ImmichClient *client, QWidg
     collectionToolbarLayout->addWidget(m_collectionBack);
     collectionToolbarLayout->addWidget(m_collectionHero);
     collectionToolbarLayout->addLayout(collectionText, 1);
+    m_collectionZoomSlider = new ZoomSlider(collectionToolbar);
+    m_collectionZoomSlider->setValue(m_collectionTileSize);
+    collectionToolbarLayout->addWidget(m_collectionZoomSlider);
+    connect(m_collectionZoomSlider, &ZoomSlider::valueChanged, this,
+            &ExplorePage::setCollectionTileSize);
+    connect(m_collectionZoomSlider, &ZoomSlider::stepRequested, this, [this](int steps) {
+        setCollectionTileSize(GridZoom::step(m_collectionTileSize, steps));
+    });
 
     m_collectionScroll = new QScrollArea(m_collectionPage);
     m_collectionScroll->setObjectName(QStringLiteral("libraryScroll"));
@@ -321,8 +331,45 @@ ExplorePage::ExplorePage(ThemeManager *themeManager, ImmichClient *client, QWidg
         }
     });
 
+    const QList<QPair<QKeySequence, int>> zoomKeys = {
+        {QKeySequence::ZoomIn, 1},
+        {QKeySequence(Qt::CTRL | Qt::Key_Equal), 1},
+        {QKeySequence(QKeyCombination(Qt::ControlModifier | Qt::KeypadModifier, Qt::Key_Plus)), 1},
+        {QKeySequence::ZoomOut, -1},
+        {QKeySequence(QKeyCombination(Qt::ControlModifier | Qt::KeypadModifier, Qt::Key_Minus)), -1},
+        {QKeySequence(Qt::CTRL | Qt::Key_0), 0}};
+    for (const auto &[keys, steps] : zoomKeys) {
+        auto *zoomShortcut = new QShortcut(keys, this);
+        zoomShortcut->setContext(Qt::WindowShortcut);
+        connect(zoomShortcut, &QShortcut::activated, this, [this, steps] {
+            if (m_stack->currentIndex() != static_cast<int>(Page::Collection))
+                return;
+            setCollectionTileSize(steps == 0 ? GridZoom::kDefault
+                                             : GridZoom::step(m_collectionTileSize, steps));
+        });
+    }
+
     m_refreshButton->setEnabled(m_client->isConfigured());
     updateEmptyState();
+}
+
+void ExplorePage::setCollectionTileSize(int size)
+{
+    size = GridZoom::clamp(size);
+    if (m_collectionTileSize == size)
+        return;
+
+    QScrollBar *scrollBar = m_collectionScroll->verticalScrollBar();
+    const qreal position =
+        scrollBar->maximum() > 0 ? qreal(scrollBar->value()) / scrollBar->maximum() : 0.0;
+    m_collectionTileSize = size;
+    m_collectionZoomSlider->setValue(size);
+    layoutCollection();
+    scrollBar->setValue(qRound(position * scrollBar->maximum()));
+
+    TimelineSettings timeline = AppSettings().loadTimeline();
+    timeline.tileSize = size;
+    AppSettings().saveTimeline(timeline);
 }
 
 void ExplorePage::setPage(Page page)
@@ -334,6 +381,8 @@ void ExplorePage::showEvent(QShowEvent *event)
 {
     QWidget::showEvent(event);
     m_collectionCompactGrid = AppSettings().loadTimeline().compactGrid;
+    m_collectionTileSize = GridZoom::clamp(AppSettings().loadTimeline().tileSize);
+    m_collectionZoomSlider->setValue(m_collectionTileSize);
     if (m_client->isConfigured() && !m_loadedOnce)
         refresh();
     if (m_stack->currentIndex() == static_cast<int>(Page::Collection)) {
@@ -368,12 +417,26 @@ void ExplorePage::releaseUiPixmaps()
 void ExplorePage::resizeEvent(QResizeEvent *event)
 {
     QWidget::resizeEvent(event);
+    QWidget *collectionToolbar = m_collectionZoomSlider->parentWidget();
+    m_collectionZoomSlider->setCompact(false);
+    collectionToolbar->layout()->activate();
+    m_collectionZoomSlider->setCompact(collectionToolbar->layout()->minimumSize().width() >
+                                       collectionToolbar->width());
     if (m_stack->currentIndex() == static_cast<int>(Page::Collection))
         scheduleCollectionLayout();
 }
 
 bool ExplorePage::eventFilter(QObject *watched, QEvent *event)
 {
+    if (watched == m_collectionScroll->viewport() && event->type() == QEvent::Wheel) {
+        auto *wheel = static_cast<QWheelEvent *>(event);
+        if (wheel->modifiers() & Qt::ControlModifier) {
+            const int delta = wheel->angleDelta().y();
+            if (delta != 0)
+                setCollectionTileSize(GridZoom::step(m_collectionTileSize, delta > 0 ? 1 : -1));
+            return true;
+        }
+    }
     if (watched == m_collectionScroll->viewport() &&
         event->type() == QEvent::Resize)
         scheduleCollectionLayout();
@@ -536,8 +599,12 @@ void ExplorePage::showAssetThumbnail(const QString &assetId, const QPixmap &thum
             raw->setPixmap(thumbnail);
     }
 
-    if (const QPointer<MediaTile> tile = m_collectionTiles.value(assetId))
+    if (const QPointer<MediaTile> tile = m_collectionTiles.value(assetId)) {
         tile->setThumbnail(thumbnail);
+        if (GridZoom::tileImageDimension(tile->size(), tile->devicePixelRatioF()) >
+            tile->thumbnailDimension())
+            scheduleCollectionVisibility();
+    }
 
     if (!m_collectionPersonStyle && m_collectionFilterKind == QStringLiteral("city") &&
         m_stack->currentIndex() == static_cast<int>(Page::Collection) &&
@@ -617,6 +684,8 @@ void ExplorePage::showCollectionPage(const QString &title, const QString &subtit
     m_collectionNextPage.clear();
     m_collectionLoadingMore = false;
     m_collectionCompactGrid = AppSettings().loadTimeline().compactGrid;
+    m_collectionTileSize = GridZoom::clamp(AppSettings().loadTimeline().tileSize);
+    m_collectionZoomSlider->setValue(m_collectionTileSize);
 
     clearCollectionTimeline();
 
@@ -798,9 +867,9 @@ void ExplorePage::layoutCollection()
 
     if (m_collectionCompactGrid) {
         constexpr int kGridGap = 3;
-        constexpr int kTargetCellSize = 132;
         const int startY = 8;
-        const int columns = qMax(1, (availableWidth + kGridGap) / (kTargetCellSize + kGridGap));
+        const int columns =
+            qMax(1, (availableWidth + kGridGap) / (m_collectionTileSize + kGridGap));
         const int cellSize = (availableWidth - (columns - 1) * kGridGap) / columns;
 
         int index = 0;
@@ -823,6 +892,8 @@ void ExplorePage::layoutCollection()
         return;
     }
 
+    const qreal minRowHeight = GridZoom::minRowHeight(m_collectionTileSize);
+    const qreal maxRowHeight = GridZoom::maxRowHeight(m_collectionTileSize);
     int y = 8;
     for (DaySection &section : m_collectionSections) {
         if (section.header) {
@@ -838,13 +909,13 @@ void ExplorePage::layoutCollection()
             if (row.isEmpty())
                 return;
             const int gaps = kGap * qMax(0, row.size() - 1);
-            qreal height = kTargetRowHeight;
+            qreal height = m_collectionTileSize;
             const qreal naturalWidth = rowAspectSum * height + gaps;
             if (justifyToWidth || naturalWidth > availableWidth) {
                 height = (availableWidth - gaps) / qMax(0.01, rowAspectSum);
-                height = qBound(qreal(kMinRowHeight), height, qreal(kMaxRowHeight));
+                height = qBound(minRowHeight, height, maxRowHeight);
             } else {
-                height = qBound(qreal(kMinRowHeight), height, qreal(kMaxRowHeight));
+                height = qBound(minRowHeight, height, maxRowHeight);
             }
 
             const bool fillWidth = justifyToWidth || naturalWidth > availableWidth;
@@ -869,7 +940,7 @@ void ExplorePage::layoutCollection()
         for (MediaTile *tile : section.tiles) {
             const qreal ratio = tile->aspectRatio();
             const qreal projected =
-                (rowAspectSum + ratio) * kTargetRowHeight + kGap * row.size();
+                (rowAspectSum + ratio) * m_collectionTileSize + kGap * row.size();
             if (!row.isEmpty() && projected > availableWidth)
                 flushRow(true);
             row.append(tile);
@@ -904,12 +975,26 @@ void ExplorePage::updateVisibleCollectionThumbs()
             if (tile->hasThumbnail()) {
                 tile->clearThumbnail();
                 m_collectionRequestedThumbs.remove(it.key());
+                m_collectionRequestedTileImages.remove(it.key());
             }
             continue;
         }
 
-        if (tile->hasThumbnail() || tile->hasThumbnailError() ||
-            m_collectionRequestedThumbs.contains(it.key()))
+        if (tile->hasThumbnail()) {
+            const int wanted =
+                GridZoom::tileImageDimension(tile->size(), tile->devicePixelRatioF());
+            if (wanted > tile->thumbnailDimension() &&
+                wanted > m_collectionRequestedTileImages.value(it.key())) {
+                m_collectionRequestedTileImages.insert(it.key(), wanted);
+                m_client->loadTileImage(it.key(), wanted);
+                if (++requested >= kMaxRequests) {
+                    scheduleCollectionVisibility();
+                    break;
+                }
+            }
+            continue;
+        }
+        if (tile->hasThumbnailError() || m_collectionRequestedThumbs.contains(it.key()))
             continue;
         m_collectionRequestedThumbs.insert(it.key());
         m_client->loadThumbnail(it.key());

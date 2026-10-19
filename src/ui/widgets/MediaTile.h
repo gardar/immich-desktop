@@ -25,6 +25,7 @@ public:
     const ImmichAsset &asset() const;
     qreal aspectRatio() const;
     bool hasThumbnail() const;
+    int thumbnailDimension() const;
     bool hasThumbnailError() const;
     void setThumbnail(const QPixmap &thumbnail);
     void setThumbnailError(const QString &message);

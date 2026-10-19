@@ -2,12 +2,14 @@
 
 #include "core/AppSettings.h"
 #include "core/FolderSyncService.h"
+#include "ui/GridZoom.h"
 #include "ui/IconUtils.h"
 #include "ui/widgets/MediaTile.h"
 #include "ui/widgets/MediaViewerDialog.h"
 #include "ui/widgets/ShareLinkDialog.h"
 #include "ui/widgets/SummaryTile.h"
 #include "ui/widgets/VideoHoverPreview.h"
+#include "ui/widgets/ZoomSlider.h"
 #include "ui/widgets/ZoomPanWidget.h"
 
 #include <QDesktopServices>
@@ -63,6 +65,7 @@
 #include <QToolButton>
 #include <QUrl>
 #include <QVBoxLayout>
+#include <QWheelEvent>
 #include <QVariantAnimation>
 
 #include <algorithm>
@@ -73,9 +76,6 @@ namespace {
 
 constexpr int kGap = 3;
 constexpr int kSidePad = 12;
-constexpr int kTargetRowHeight = 132;
-constexpr int kMaxRowHeight = 148;
-constexpr int kMinRowHeight = 96;
 constexpr int kAutoCheckIntervalMs = 30 * 1000;
 constexpr int kSearchDebounceMs = 350;
 
@@ -130,7 +130,9 @@ LibraryPage::LibraryPage(ThemeManager *themeManager, ImmichClient *client,
     connect(m_searchDebounce, &QTimer::timeout, this, &LibraryPage::applySearch);
     setObjectName(QStringLiteral("libraryPage"));
     setAcceptDrops(true);
-    m_compactGrid = AppSettings().loadTimeline().compactGrid;
+    const TimelineSettings timeline = AppSettings().loadTimeline();
+    m_compactGrid = timeline.compactGrid;
+    m_tileSize = GridZoom::clamp(timeline.tileSize);
 
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(0, 0, 0, 0);
@@ -145,11 +147,11 @@ LibraryPage::LibraryPage(ThemeManager *themeManager, ImmichClient *client,
 
     auto *headingColumn = new QVBoxLayout;
     headingColumn->setSpacing(2);
-    auto *heading = new QLabel(tr("Photos & videos"), toolbar);
-    heading->setProperty("heading", true);
+    m_heading = new QLabel(tr("Photos & videos"), toolbar);
+    m_heading->setProperty("heading", true);
     m_status->setProperty("subheading", true);
     m_status->setText(tr("Your Immich library"));
-    headingColumn->addWidget(heading);
+    headingColumn->addWidget(m_heading);
     headingColumn->addWidget(m_status);
     toolbarLayout->addLayout(headingColumn, 1);
 
@@ -175,6 +177,12 @@ LibraryPage::LibraryPage(ThemeManager *themeManager, ImmichClient *client,
     toolbarLayout->addWidget(m_uploadButton);
     toolbarLayout->addWidget(m_refreshButton);
     toolbarLayout->addWidget(m_yearsButton);
+    m_zoomSlider = new ZoomSlider(toolbar);
+    m_zoomSlider->setValue(m_tileSize);
+    toolbarLayout->addWidget(m_zoomSlider);
+    connect(m_zoomSlider, &ZoomSlider::valueChanged, this, &LibraryPage::setTileSize);
+    connect(m_zoomSlider, &ZoomSlider::stepRequested, this,
+            [this](int steps) { setTileSize(GridZoom::step(m_tileSize, steps)); });
     configureActionButton(m_uploadButton, QStringLiteral(":/icons/upload.svg"));
     configureActionButton(m_refreshButton, QStringLiteral(":/icons/refresh-cw.svg"));
     configureActionButton(m_yearsButton, QStringLiteral(":/icons/calendar.svg"));
@@ -564,6 +572,21 @@ LibraryPage::LibraryPage(ThemeManager *themeManager, ImmichClient *client,
     pasteShortcut->setContext(Qt::WidgetWithChildrenShortcut);
     connect(pasteShortcut, &QShortcut::activated, this, &LibraryPage::pasteFromClipboard);
 
+    const QList<QPair<QKeySequence, int>> zoomKeys = {
+        {QKeySequence::ZoomIn, 1},
+        {QKeySequence(Qt::CTRL | Qt::Key_Equal), 1},
+        {QKeySequence(QKeyCombination(Qt::ControlModifier | Qt::KeypadModifier, Qt::Key_Plus)), 1},
+        {QKeySequence::ZoomOut, -1},
+        {QKeySequence(QKeyCombination(Qt::ControlModifier | Qt::KeypadModifier, Qt::Key_Minus)), -1},
+        {QKeySequence(Qt::CTRL | Qt::Key_0), 0}};
+    for (const auto &[keys, steps] : zoomKeys) {
+        auto *zoomShortcut = new QShortcut(keys, this);
+        zoomShortcut->setContext(Qt::WindowShortcut);
+        connect(zoomShortcut, &QShortcut::activated, this, [this, steps] {
+            setTileSize(steps == 0 ? GridZoom::kDefault : GridZoom::step(m_tileSize, steps));
+        });
+    }
+
     auto *copyShortcut = new QShortcut(QKeySequence::Copy, this);
     copyShortcut->setContext(Qt::WidgetWithChildrenShortcut);
     connect(copyShortcut, &QShortcut::activated, this, [this] {
@@ -584,6 +607,25 @@ void LibraryPage::setCompactGrid(bool enabled)
         return;
     m_compactGrid = enabled;
     scheduleLayout();
+}
+
+void LibraryPage::setTileSize(int size)
+{
+    size = GridZoom::clamp(size);
+    if (m_tileSize == size)
+        return;
+
+    QScrollBar *scrollBar = m_scrollArea->verticalScrollBar();
+    const qreal position =
+        scrollBar->maximum() > 0 ? qreal(scrollBar->value()) / scrollBar->maximum() : 0.0;
+    m_tileSize = size;
+    m_zoomSlider->setValue(size);
+    layoutTimeline();
+    scrollBar->setValue(qRound(position * scrollBar->maximum()));
+
+    TimelineSettings timeline = AppSettings().loadTimeline();
+    timeline.tileSize = size;
+    AppSettings().saveTimeline(timeline);
 }
 
 void LibraryPage::refresh()
@@ -730,6 +772,29 @@ void LibraryPage::updateSearchExpansion()
     m_searchSettingsButton->setVisible(m_searchActivated && expanded);
     m_searchField->setMaximumWidth(expanded ? 520 : 360);
     m_searchToolbarLayout->setStretch(0, expanded ? 0 : 1);
+    updateToolbarDensity();
+}
+
+void LibraryPage::updateToolbarDensity()
+{
+    const QWidget *toolbar = m_searchToolbarLayout->parentWidget();
+    // Try the roomiest arrangement first; drop button labels, the slider, then the title.
+    auto fits = [this, toolbar](int stage) {
+        for (QPushButton *button : {m_uploadButton, m_refreshButton, m_yearsButton}) {
+            if (!button->property("fullLabel").isValid())
+                button->setProperty("fullLabel", button->property("actionLabel"));
+            const QString label =
+                stage >= 1 ? QString() : button->property("fullLabel").toString();
+            if (button->property("actionLabel").toString() != label)
+                setActionButtonLabel(button, label);
+        }
+        m_zoomSlider->setCompact(stage >= 2);
+        m_heading->setVisible(stage < 3);
+        m_searchToolbarLayout->activate();
+        return m_searchToolbarLayout->minimumSize().width() <= toolbar->width();
+    };
+    if (!fits(0) && !fits(1) && !fits(2))
+        fits(3);
 }
 
 void LibraryPage::animateSearchPanel(bool open)
@@ -1473,6 +1538,9 @@ void LibraryPage::showThumbnail(const QString &assetId, const QPixmap &thumbnail
 
     const qreal oldRatio = tile->aspectRatio();
     tile->setThumbnail(thumbnail);
+    if (GridZoom::tileImageDimension(tile->size(), tile->devicePixelRatioF()) >
+        tile->thumbnailDimension())
+        scheduleVisibleMediaUpdate();
     // Compact grid ignores aspect ratio. Masonry only needs a relayout when the
     // ratio actually changes - relayouting on every thumbnail freezes scrolling.
     if (!m_compactGrid && qAbs(tile->aspectRatio() - oldRatio) > 0.03)
@@ -1570,9 +1638,8 @@ void LibraryPage::layoutTimeline()
 
     if (m_compactGrid) {
         constexpr int kGridGap = 3;
-        constexpr int kTargetCellSize = 132;
         const int startY = 8;
-        const int columns = qMax(1, (availableWidth + kGridGap) / (kTargetCellSize + kGridGap));
+        const int columns = qMax(1, (availableWidth + kGridGap) / (m_tileSize + kGridGap));
         const int cellSize = (availableWidth - (columns - 1) * kGridGap) / columns;
 
         int index = 0;
@@ -1597,6 +1664,8 @@ void LibraryPage::layoutTimeline()
         return;
     }
 
+    const qreal minRowHeight = GridZoom::minRowHeight(m_tileSize);
+    const qreal maxRowHeight = GridZoom::maxRowHeight(m_tileSize);
     int y = 8;
 
     for (int sectionIndex = 0; sectionIndex < m_sections.size(); ++sectionIndex) {
@@ -1616,13 +1685,13 @@ void LibraryPage::layoutTimeline()
                 return;
 
             const int gaps = kGap * qMax(0, row.size() - 1);
-            qreal height = kTargetRowHeight;
+            qreal height = m_tileSize;
             const qreal naturalWidth = rowAspectSum * height + gaps;
             if (justifyToWidth || naturalWidth > availableWidth) {
                 height = (availableWidth - gaps) / qMax(0.01, rowAspectSum);
-                height = qBound(qreal(kMinRowHeight), height, qreal(kMaxRowHeight));
+                height = qBound(minRowHeight, height, maxRowHeight);
             } else {
-                height = qBound(qreal(kMinRowHeight), height, qreal(kMaxRowHeight));
+                height = qBound(minRowHeight, height, maxRowHeight);
             }
 
             const bool fillWidth = justifyToWidth || naturalWidth > availableWidth;
@@ -1647,7 +1716,7 @@ void LibraryPage::layoutTimeline()
         for (MediaTile *tile : section.tiles) {
             const qreal ratio = tile->aspectRatio();
             const qreal projected =
-                (rowAspectSum + ratio) * kTargetRowHeight + kGap * row.size();
+                (rowAspectSum + ratio) * m_tileSize + kGap * row.size();
             if (!row.isEmpty() && projected > availableWidth)
                 flushRow(true);
             row.append(tile);
@@ -1710,12 +1779,27 @@ void LibraryPage::updateVisibleMedia()
             if (tile->hasThumbnail()) {
                 tile->clearThumbnail();
                 m_requestedThumbnails.remove(assetId);
+                m_requestedTileImages.remove(assetId);
             }
             continue;
         }
 
-        if (tile->hasThumbnail() || tile->hasThumbnailError() ||
-            m_requestedThumbnails.contains(assetId))
+        if (tile->hasThumbnail()) {
+            const int wanted =
+                GridZoom::tileImageDimension(tile->size(), tile->devicePixelRatioF());
+            if (wanted > tile->thumbnailDimension() &&
+                wanted > m_requestedTileImages.value(assetId) &&
+                !m_localAssetIds.contains(assetId)) {
+                m_requestedTileImages.insert(assetId, wanted);
+                m_client->loadTileImage(assetId, wanted);
+                if (++requested >= kMaxThumbnailRequestsPerTick) {
+                    scheduleVisibleMediaUpdate();
+                    break;
+                }
+            }
+            continue;
+        }
+        if (tile->hasThumbnailError() || m_requestedThumbnails.contains(assetId))
             continue;
         m_requestedThumbnails.insert(assetId);
         if (m_localAssetIds.contains(assetId)) {
@@ -2363,6 +2447,15 @@ bool LibraryPage::handleDragEvent(QEvent *event)
 
 bool LibraryPage::eventFilter(QObject *watched, QEvent *event)
 {
+    if (watched == m_scrollArea->viewport() && event->type() == QEvent::Wheel) {
+        auto *wheel = static_cast<QWheelEvent *>(event);
+        if (wheel->modifiers() & Qt::ControlModifier) {
+            const int delta = wheel->angleDelta().y();
+            if (delta != 0)
+                setTileSize(GridZoom::step(m_tileSize, delta > 0 ? 1 : -1));
+            return true;
+        }
+    }
     if (watched == m_searchPanel &&
         (event->type() == QEvent::PaletteChange || event->type() == QEvent::StyleChange))
         QTimer::singleShot(0, this, &LibraryPage::updateSearchOptionsUi);
@@ -2408,6 +2501,7 @@ void LibraryPage::dropEvent(QDropEvent *event)
 void LibraryPage::resizeEvent(QResizeEvent *event)
 {
     QWidget::resizeEvent(event);
+    updateToolbarDensity();
     layoutTimeline();
     layoutYearGrid();
     layoutYearDetail();

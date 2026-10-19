@@ -1,12 +1,15 @@
 #include "ui/widgets/Sidebar.h"
 
 #include "AppVersion.h"
+#include "core/AppSettings.h"
 #include "core/ThemeManager.h"
 #include "ui/widgets/AnimatedButton.h"
 
 #include <QButtonGroup>
+#include <QEasingCurve>
 #include <QLabel>
 #include <QVBoxLayout>
+#include <QVariantAnimation>
 
 namespace Aurora {
 
@@ -16,9 +19,13 @@ Sidebar::Sidebar(ThemeManager *themeManager, QWidget *parent)
     , m_navigationLabel(new QLabel(this))
     , m_navigationLayout(new QVBoxLayout)
     , m_navigationGroup(nullptr)
+    , m_version(new QLabel(this))
+    , m_toggleButton(new AnimatedButton(tr("Collapse"), QStringLiteral(":/icons/panel-left-close.svg"),
+                                        themeManager, this))
+    , m_widthAnimation(new QVariantAnimation(this))
+    , m_collapsed(AppSettings().loadWindow().sidebarCollapsed)
 {
     setObjectName(QStringLiteral("sidebar"));
-    setFixedWidth(224);
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(14, 18, 14, 14);
@@ -34,22 +41,77 @@ Sidebar::Sidebar(ThemeManager *themeManager, QWidget *parent)
 
     layout->addStretch();
 
-    auto *version = new QLabel(
-        tr("fan-made\nimmich desktop  ·  v%1")
-            .arg(QString::fromLatin1(Config::ApplicationVersion)),
-        this);
-    version->setProperty("subheading", true);
-    version->setAlignment(Qt::AlignCenter);
-    version->setWordWrap(true);
-    layout->addWidget(version);
-    auto refreshLayout = [this, version] {
-        const bool minimal = m_themeManager->minimalistUi();
-        setFixedWidth(minimal ? 76 : 224);
-        m_navigationLabel->setVisible(!minimal);
-        version->setVisible(!minimal);
-    };
-    connect(m_themeManager, &ThemeManager::appearanceChanged, this, refreshLayout);
-    refreshLayout();
+    m_toggleButton->setCheckable(false);
+    connect(m_toggleButton, &QPushButton::clicked, this, &Sidebar::toggleCollapsed);
+    layout->addWidget(m_toggleButton);
+
+    m_version->setText(tr("fan-made\nimmich desktop  ·  v%1")
+                           .arg(QString::fromLatin1(Config::ApplicationVersion)));
+    m_version->setProperty("subheading", true);
+    m_version->setAlignment(Qt::AlignCenter);
+    m_version->setWordWrap(true);
+    layout->addWidget(m_version);
+
+    m_widthAnimation->setDuration(160);
+    m_widthAnimation->setEasingCurve(QEasingCurve::OutCubic);
+    connect(m_widthAnimation, &QVariantAnimation::valueChanged, this,
+            [this](const QVariant &width) { setFixedWidth(width.toInt()); });
+    connect(m_themeManager, &ThemeManager::appearanceChanged, this,
+            [this] { refreshLayout(false); });
+    refreshLayout(false);
+}
+
+void Sidebar::toggleCollapsed()
+{
+    if (m_narrow) {
+        m_expandedWhileNarrow = !m_expandedWhileNarrow;
+    } else {
+        m_collapsed = !m_collapsed;
+        WindowSettings window = AppSettings().loadWindow();
+        window.sidebarCollapsed = m_collapsed;
+        AppSettings().saveWindow(window);
+    }
+    refreshLayout(true);
+}
+
+void Sidebar::setNarrow(bool narrow)
+{
+    if (m_narrow == narrow)
+        return;
+    m_narrow = narrow;
+    m_expandedWhileNarrow = false;
+    refreshLayout(true);
+}
+
+bool Sidebar::isCollapsed() const
+{
+    return m_narrow ? !m_expandedWhileNarrow : m_collapsed;
+}
+
+void Sidebar::refreshLayout(bool animate)
+{
+    const bool minimal = m_themeManager->minimalistUi();
+    const bool collapsed = minimal || isCollapsed();
+    m_navigationLabel->setVisible(!collapsed);
+    m_version->setVisible(!collapsed);
+    m_toggleButton->setVisible(!minimal);
+    m_toggleButton->setText(collapsed ? tr("Expand") : tr("Collapse"));
+    m_toggleButton->setToolTip(collapsed ? tr("Expand sidebar (F9)")
+                                         : tr("Collapse sidebar (F9)"));
+    m_toggleButton->setIconResource(collapsed ? QStringLiteral(":/icons/panel-left-open.svg")
+                                              : QStringLiteral(":/icons/panel-left-close.svg"));
+    for (AnimatedButton *button : findChildren<AnimatedButton *>())
+        button->setIconOnly(collapsed);
+
+    const int target = collapsed ? 76 : 224;
+    m_widthAnimation->stop();
+    if (animate && isVisible() && width() != target) {
+        m_widthAnimation->setStartValue(width());
+        m_widthAnimation->setEndValue(target);
+        m_widthAnimation->start();
+    } else {
+        setFixedWidth(target);
+    }
 }
 
 void Sidebar::setCurrentPage(int index)
@@ -68,6 +130,7 @@ void Sidebar::addNavigation(const QString &label, const QString &icon, int index
 {
     auto *button = new AnimatedButton(label, icon, m_themeManager, this);
     button->setCheckable(checkable);
+    button->setIconOnly(m_themeManager->minimalistUi() || isCollapsed());
     if (checkable)
         m_navigationGroup->addButton(button, index);
     m_navigationLayout->addWidget(button);

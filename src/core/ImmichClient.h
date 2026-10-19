@@ -57,6 +57,9 @@ public:
     void loadAssetsForCity(const QString &city, int page = 1, int pageSize = 80);
     void loadThumbnail(const QString &assetId);
     void loadPreview(const QString &assetId);
+    // Emits thumbnailLoaded with an image of up to maximumDimension pixels,
+    // decoded from the preview when the thumbnail is too small.
+    void loadTileImage(const QString &assetId, int maximumDimension);
     void loadPersonThumbnail(const QString &personId);
     // Drop in-RAM thumbnail/preview pixmaps (disk cache kept). Call when the
     // window is hidden to tray/minimized so idle RSS stays low.
