@@ -57,6 +57,81 @@ ImmichAsset assetFromObject(const QJsonObject &object)
     return asset;
 }
 
+// Immich stores uploads as <media>/library/<user>/<storage template>/file when a
+// storage template is active, and as <media>/upload/<user>/xx/yy/file otherwise.
+// Show only the template part; hashed upload folders mean nothing to people.
+// External library paths are the user's own folders and stay as they are.
+QString displayFolder(const QString &originalPath)
+{
+    const QString folder = originalPath.left(qMax(0, originalPath.lastIndexOf(u'/')));
+    const QStringList parts = folder.split(u'/', Qt::SkipEmptyParts);
+    const qsizetype library = parts.indexOf(QStringLiteral("library"));
+    if (library >= 0 && library + 2 <= parts.size())
+        return parts.mid(library + 2).join(u'/');
+    if (parts.contains(QStringLiteral("upload")))
+        return {};
+    return folder;
+}
+
+ImmichAssetDetails assetDetailsFromObject(const QJsonObject &object)
+{
+    ImmichAssetDetails details;
+    details.asset = assetFromObject(object);
+    details.localDateTime =
+        QDateTime::fromString(object.value(QStringLiteral("localDateTime")).toString(),
+                              Qt::ISODateWithMs)
+            .toUTC();
+
+    const QJsonObject exif = object.value(QStringLiteral("exifInfo")).toObject();
+    details.timeZone = exif.value(QStringLiteral("timeZone")).toString();
+    details.width = exif.value(QStringLiteral("exifImageWidth")).toInt(
+        object.value(QStringLiteral("width")).toInt());
+    details.height = exif.value(QStringLiteral("exifImageHeight")).toInt(
+        object.value(QStringLiteral("height")).toInt());
+    details.fileSize = exif.value(QStringLiteral("fileSizeInByte")).toInteger();
+    details.make = exif.value(QStringLiteral("make")).toString();
+    details.model = exif.value(QStringLiteral("model")).toString();
+    details.lens = exif.value(QStringLiteral("lensModel")).toString();
+    details.fNumber = exif.value(QStringLiteral("fNumber")).toDouble();
+    details.focalLength = exif.value(QStringLiteral("focalLength")).toDouble();
+    details.iso = exif.value(QStringLiteral("iso")).toInt();
+    details.exposureTime = exif.value(QStringLiteral("exposureTime")).toString();
+    const QJsonValue latitude = exif.value(QStringLiteral("latitude"));
+    const QJsonValue longitude = exif.value(QStringLiteral("longitude"));
+    details.hasLocation = latitude.isDouble() && longitude.isDouble();
+    details.latitude = latitude.toDouble();
+    details.longitude = longitude.toDouble();
+    details.city = exif.value(QStringLiteral("city")).toString();
+    details.state = exif.value(QStringLiteral("state")).toString();
+    details.country = exif.value(QStringLiteral("country")).toString();
+    details.description = exif.value(QStringLiteral("description")).toString();
+
+    details.folder = displayFolder(object.value(QStringLiteral("originalPath")).toString());
+
+    for (const QJsonValue &value : object.value(QStringLiteral("people")).toArray()) {
+        const QJsonObject person = value.toObject();
+        ImmichPerson entry;
+        entry.id = person.value(QStringLiteral("id")).toString();
+        entry.name = person.value(QStringLiteral("name")).toString();
+        entry.hidden = person.value(QStringLiteral("isHidden")).toBool();
+        if (!entry.id.isEmpty() && !entry.hidden)
+            details.people.append(entry);
+    }
+    details.ownerId = object.value(QStringLiteral("ownerId")).toString();
+    const QJsonObject owner = object.value(QStringLiteral("owner")).toObject();
+    details.ownerName = owner.value(QStringLiteral("name")).toString(
+        owner.value(QStringLiteral("email")).toString());
+
+    for (const QJsonValue &value : object.value(QStringLiteral("tags")).toArray()) {
+        const QJsonObject tag = value.toObject();
+        const QString name = tag.value(QStringLiteral("value")).toString(
+            tag.value(QStringLiteral("name")).toString());
+        if (!name.isEmpty())
+            details.tags.append(name);
+    }
+    return details;
+}
+
 QList<ImmichAsset> assetsFromSearchBody(const QByteArray &body, QString *nextPage)
 {
     const QJsonObject assetsObject =
@@ -306,6 +381,7 @@ void ImmichClient::setConnection(const ImmichConnectionSettings &connection, boo
     }
 
     if (changed) {
+        m_currentUserId.clear();
         releaseMemoryCaches();
         if (m_streamServer)
             ensureStreamServer();
@@ -1449,6 +1525,75 @@ void ImmichClient::fetchAssetInfo(const QString &assetId)
             asset.id = assetId;
         emit assetInfoLoaded(asset);
         reply->deleteLater();
+    });
+}
+
+void ImmichClient::fetchAssetDetails(const QString &assetId)
+{
+    if (!isConfigured() || !isValidImmichId(assetId)) {
+        emit assetDetailsFailed(assetId, tr("The asset identifier is invalid."));
+        return;
+    }
+    if (!m_currentUserId.isEmpty()) {
+        requestAssetDetails(assetId);
+        return;
+    }
+
+    // Know who we are first, so "shared by" can tell other users' photos apart.
+    auto *reply = m_network->get(authenticatedRequest(apiUrl(QStringLiteral("/users/me"))));
+    connect(reply, &QNetworkReply::finished, this, [this, reply, assetId] {
+        if (reply->error() == QNetworkReply::NoError) {
+            m_currentUserId = QJsonDocument::fromJson(reply->readAll())
+                                  .object()
+                                  .value(QStringLiteral("id"))
+                                  .toString();
+        }
+        requestAssetDetails(assetId);
+        reply->deleteLater();
+    });
+}
+
+void ImmichClient::requestAssetDetails(const QString &assetId)
+{
+    auto *reply =
+        m_network->get(authenticatedRequest(apiUrl(QStringLiteral("/assets/%1").arg(assetId))));
+    connect(reply, &QNetworkReply::finished, this, [this, reply, assetId] {
+        const QByteArray body = reply->readAll();
+        if (reply->error() != QNetworkReply::NoError) {
+            emit assetDetailsFailed(assetId, errorMessage(reply, body));
+        } else {
+            ImmichAssetDetails details =
+                assetDetailsFromObject(QJsonDocument::fromJson(body).object());
+            details.asset.id = assetId;
+            details.sharedByOtherUser = !m_currentUserId.isEmpty() &&
+                                        !details.ownerId.isEmpty() &&
+                                        details.ownerId != m_currentUserId;
+            emit assetDetailsLoaded(details);
+        }
+        reply->deleteLater();
+    });
+
+    // Albums need album.read, which API keys made for older versions may lack.
+    QUrl albumsUrl = apiUrl(QStringLiteral("/albums"));
+    albumsUrl.setQuery(QUrlQuery{{QStringLiteral("assetId"), assetId}});
+    auto *albumsReply = m_network->get(authenticatedRequest(albumsUrl));
+    connect(albumsReply, &QNetworkReply::finished, this, [this, albumsReply, assetId] {
+        const QByteArray body = albumsReply->readAll();
+        if (albumsReply->error() == QNetworkReply::NoError) {
+            QStringList names;
+            for (const QJsonValue &value : QJsonDocument::fromJson(body).array()) {
+                const QString name =
+                    value.toObject().value(QStringLiteral("albumName")).toString();
+                if (!name.isEmpty())
+                    names.append(name);
+            }
+            emit assetAlbumsLoaded(assetId, names);
+        } else {
+            const int status =
+                albumsReply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            emit assetAlbumsFailed(assetId, status == 403);
+        }
+        albumsReply->deleteLater();
     });
 }
 
