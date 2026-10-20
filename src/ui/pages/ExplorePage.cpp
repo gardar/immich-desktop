@@ -642,6 +642,16 @@ void ExplorePage::openPerson(const ImmichPerson &person)
     m_client->loadAssetsForPerson(person.id);
 }
 
+void ExplorePage::showPerson(const ImmichPerson &person)
+{
+    openPerson(person);
+}
+
+void ExplorePage::showPlace(const QString &city)
+{
+    openPlace(ImmichPlace{city, {}});
+}
+
 void ExplorePage::openPlace(const ImmichPlace &place)
 {
     m_pendingCollectionTitle = place.city;
@@ -1045,6 +1055,9 @@ void ExplorePage::openAsset(const ImmichAsset &asset, bool fromCollection)
             &ExplorePage::downloadRequested);
     connect(viewer, &MediaViewerDialog::trashRequested, this, &ExplorePage::trashRequested);
     connect(viewer, &MediaViewerDialog::deleteRequested, this, &ExplorePage::deleteRequested);
+    connect(viewer, &MediaViewerDialog::personRequested, this, &ExplorePage::personRequested);
+    connect(viewer, &MediaViewerDialog::placeRequested, this, &ExplorePage::placeRequested);
+    connect(viewer, &MediaViewerDialog::dateRequested, this, &ExplorePage::dateRequested);
     viewer->show();
 }
 

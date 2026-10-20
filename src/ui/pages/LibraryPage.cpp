@@ -484,16 +484,7 @@ LibraryPage::LibraryPage(ThemeManager *themeManager, ImmichClient *client,
         m_searchDateTo->setEnabled(enabled);
         optionsChanged();
     });
-    connect(resetSearch, &QPushButton::clicked, this, [this] {
-        m_resettingSearchOptions = true;
-        for (auto *field : {m_searchScope, m_searchPerson, m_searchMedia, m_searchMode})
-            field->setCurrentIndex(0);
-        m_searchPlace->clear();
-        m_searchDateEnabled->setChecked(false);
-        m_resettingSearchOptions = false;
-        m_searchDebounce->stop();
-        applySearch();
-    });
+    connect(resetSearch, &QPushButton::clicked, this, &LibraryPage::resetSearchFilters);
     connect(m_client, &ImmichClient::exploreLoaded, this, [this](const ImmichExploreData &data) {
         const QString selected = m_searchPerson->currentData().toString();
         const QSignalBlocker blocker(m_searchPerson);
@@ -773,6 +764,32 @@ void LibraryPage::updateSearchExpansion()
     m_searchField->setMaximumWidth(expanded ? 520 : 360);
     m_searchToolbarLayout->setStretch(0, expanded ? 0 : 1);
     updateToolbarDensity();
+}
+
+void LibraryPage::resetSearchFilters()
+{
+    m_resettingSearchOptions = true;
+    for (auto *field : {m_searchScope, m_searchPerson, m_searchMedia, m_searchMode})
+        field->setCurrentIndex(0);
+    m_searchPlace->clear();
+    m_searchDateEnabled->setChecked(false);
+    m_resettingSearchOptions = false;
+    m_searchDebounce->stop();
+    applySearch();
+}
+
+void LibraryPage::showDay(const QDate &day)
+{
+    if (m_searchActive || m_monthBuckets.isEmpty()) {
+        // Jump once the timeline's month list has (re)loaded.
+        m_pendingDay = day;
+        if (m_searchActive) {
+            m_searchField->clear();
+            resetSearchFilters();
+        }
+        return;
+    }
+    jumpToDate(day);
 }
 
 void LibraryPage::updateToolbarDensity()
@@ -1104,6 +1121,11 @@ void LibraryPage::handleTimelineBucketsLoaded(const QList<TimeBucketInfo> &bucke
 
     m_monthBuckets = buckets;
     m_nextBucketIndex = 0;
+
+    if (m_pendingDay.isValid() && !m_monthBuckets.isEmpty()) {
+        jumpToDate(std::exchange(m_pendingDay, QDate()));
+        return;
+    }
 
     if (m_monthBuckets.isEmpty()) {
         m_loading = false;
@@ -1920,6 +1942,9 @@ void LibraryPage::openAsset(const ImmichAsset &asset)
     connect(viewer, &MediaViewerDialog::trashRequested, this, &LibraryPage::trashAsset);
     connect(viewer, &MediaViewerDialog::deleteRequested, this,
             &LibraryPage::deleteAssetPermanently);
+    connect(viewer, &MediaViewerDialog::personRequested, this, &LibraryPage::personRequested);
+    connect(viewer, &MediaViewerDialog::placeRequested, this, &LibraryPage::placeRequested);
+    connect(viewer, &MediaViewerDialog::dateRequested, this, &LibraryPage::dateRequested);
     viewer->show();
 }
 

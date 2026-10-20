@@ -66,6 +66,13 @@ signals:
     void downloadRequested(const Aurora::ImmichAsset &asset);
     void trashRequested(const Aurora::ImmichAsset &asset);
     void deleteRequested(const Aurora::ImmichAsset &asset);
+    void personRequested(const Aurora::ImmichPerson &person);
+    void placeRequested(const QString &city);
+    void dateRequested(const QDate &date);
+
+public slots:
+    void showPerson(const Aurora::ImmichPerson &person);
+    void showPlace(const QString &city);
 
 protected:
     void showEvent(QShowEvent *event) override;

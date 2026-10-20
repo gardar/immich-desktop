@@ -50,7 +50,13 @@ public:
     void setCompactGrid(bool enabled);
     void setTileSize(int size);
 
+signals:
+    void personRequested(const Aurora::ImmichPerson &person);
+    void placeRequested(const QString &city);
+    void dateRequested(const QDate &date);
+
 public slots:
+    void showDay(const QDate &day);
     void copyAsset(const Aurora::ImmichAsset &asset);
     void downloadAsset(const Aurora::ImmichAsset &asset);
     void trashAsset(const Aurora::ImmichAsset &asset);
@@ -134,6 +140,7 @@ private:
     QJsonObject searchOptions() const;
     void updateSearchExpansion();
     void updateToolbarDensity();
+    void resetSearchFilters();
     void animateSearchPanel(bool open);
     void updateSearchOptionsUi();
     ImmichAsset currentAssetForClipboard() const;
@@ -225,6 +232,7 @@ private:
     QList<TimeBucketInfo> m_monthBuckets;
     int m_nextBucketIndex = 0;
     QDate m_pendingScrollToDate;
+    QDate m_pendingDay;
     int m_jumpTargetBucketIndex = -1;
 
     // Year grid state.
