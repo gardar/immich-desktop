@@ -291,6 +291,7 @@ void MediaTile::contextMenuEvent(QContextMenuEvent *event)
     QMenu menu(this);
     menu.addAction(tr("Open"), this, [this] { emit activated(m_asset); });
     if (!m_asset.isLocalPending()) {
+        menu.addAction(tr("Info"), this, [this] { emit infoRequested(m_asset); });
         if (!m_asset.isVideo())
             menu.addAction(tr("Copy"), this, [this] { emit copyRequested(m_asset); });
         menu.addAction(tr("Download"), this, [this] { emit downloadRequested(m_asset); });

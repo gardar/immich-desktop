@@ -830,6 +830,9 @@ void ExplorePage::appendCollectionAssets(const QList<ImmichAsset> &assets)
         m_collectionTiles.insert(asset.id, tile);
         connect(tile, &MediaTile::activated, this,
                 [this, asset] { openAsset(asset, true); });
+        connect(tile, &MediaTile::infoRequested, this, [this, asset] {
+            openAsset(asset, true)->setInfoPanelVisible(true);
+        });
         connect(tile, &MediaTile::shareRequested, this, [this](const ImmichAsset &asset) {
             (new ShareLinkDialog(m_client, asset, this))->show();
         });
@@ -1039,7 +1042,7 @@ void ExplorePage::backToBrowse()
     updateEmptyState();
 }
 
-void ExplorePage::openAsset(const ImmichAsset &asset, bool fromCollection)
+MediaViewerDialog *ExplorePage::openAsset(const ImmichAsset &asset, bool fromCollection)
 {
     if (asset.isVideo() && m_collectionHoverPreview)
         m_collectionHoverPreview->stop();
@@ -1059,6 +1062,7 @@ void ExplorePage::openAsset(const ImmichAsset &asset, bool fromCollection)
     connect(viewer, &MediaViewerDialog::placeRequested, this, &ExplorePage::placeRequested);
     connect(viewer, &MediaViewerDialog::dateRequested, this, &ExplorePage::dateRequested);
     viewer->show();
+    return viewer;
 }
 
 ImmichAsset ExplorePage::adjacentAsset(bool fromCollection, const QString &assetId, int step)

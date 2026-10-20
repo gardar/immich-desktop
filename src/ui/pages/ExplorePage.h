@@ -29,6 +29,7 @@ namespace Aurora {
 
 class ThemeManager;
 class MediaTile;
+class MediaViewerDialog;
 class VideoHoverPreview;
 class ZoomSlider;
 
@@ -91,7 +92,6 @@ private slots:
     void handleAssetsDeleted(const QStringList &assetIds);
     void openPerson(const Aurora::ImmichPerson &person);
     void openPlace(const Aurora::ImmichPlace &place);
-    void openAsset(const Aurora::ImmichAsset &asset, bool fromCollection);
     void backToBrowse();
     void requestCollectionNextPage();
     void layoutCollection();
@@ -124,6 +124,7 @@ private:
     void updateCollectionLoadMore(const QString &nextPage);
     ImmichAsset adjacentAsset(bool fromCollection, const QString &assetId, int step);
     void setPage(Page page);
+    MediaViewerDialog *openAsset(const Aurora::ImmichAsset &asset, bool fromCollection);
     void setCollectionTileSize(int size);
     void setCollectionHero(const QPixmap &thumb, bool personStyle);
     void scheduleCollectionLayout();

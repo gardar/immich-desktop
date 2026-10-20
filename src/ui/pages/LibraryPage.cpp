@@ -1000,6 +1000,10 @@ void LibraryPage::appendAssetsToTimeline(const QList<ImmichAsset> &assets)
         section->tiles.append(tile);
         m_tilesById.insert(asset.id, tile);
         connect(tile, &MediaTile::activated, this, &LibraryPage::openAsset);
+        connect(tile, &MediaTile::infoRequested, this, [this](const ImmichAsset &asset) {
+            if (MediaViewerDialog *viewer = openAsset(asset))
+                viewer->setInfoPanelVisible(true);
+        });
         connect(tile, &MediaTile::highlighted, this, [this](const ImmichAsset &asset) {
             m_currentAsset = asset;
         });
@@ -1922,13 +1926,13 @@ void LibraryPage::handleUploadQueueChanged(int pendingCount)
     m_status->setText(tr("%n file(s) waiting to upload", nullptr, pendingCount));
 }
 
-void LibraryPage::openAsset(const ImmichAsset &asset)
+MediaViewerDialog *LibraryPage::openAsset(const ImmichAsset &asset)
 {
     m_currentAsset = asset;
     if (asset.isLocalPending()) {
         if (!asset.localPath.isEmpty())
             QDesktopServices::openUrl(QUrl::fromLocalFile(asset.localPath));
-        return;
+        return nullptr;
     }
     if (asset.isVideo() && m_videoHoverPreview)
         m_videoHoverPreview->stop();
@@ -1946,6 +1950,7 @@ void LibraryPage::openAsset(const ImmichAsset &asset)
     connect(viewer, &MediaViewerDialog::placeRequested, this, &LibraryPage::placeRequested);
     connect(viewer, &MediaViewerDialog::dateRequested, this, &LibraryPage::dateRequested);
     viewer->show();
+    return viewer;
 }
 
 ImmichAsset LibraryPage::adjacentAsset(const QString &assetId, int step)

@@ -11,6 +11,7 @@
 #include <QKeySequence>
 #include <QPushButton>
 #include <QShortcut>
+#include <QSignalBlocker>
 #include <QStackedWidget>
 #include <QVBoxLayout>
 
@@ -175,8 +176,10 @@ void MediaViewerDialog::setAsset(const ImmichAsset &asset, bool autoplay)
 
 void MediaViewerDialog::setInfoPanelVisible(bool visible)
 {
-    m_infoPanel->setVisible(visible);
+    // Only the Info button and I key change the remembered preference.
+    const QSignalBlocker blocker(m_infoButton);
     m_infoButton->setChecked(visible);
+    m_infoPanel->setVisible(visible);
 }
 
 void MediaViewerDialog::step(int direction)

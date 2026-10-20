@@ -37,6 +37,7 @@ namespace Aurora {
 class ThemeManager;
 class FolderSyncService;
 class MediaTile;
+class MediaViewerDialog;
 class SummaryTile;
 class VideoHoverPreview;
 class ZoomSlider;
@@ -85,7 +86,6 @@ private slots:
     void showThumbnailError(const QString &assetId, const QString &resultSize,
                             const QString &message);
     void showRequestError(const QString &operation, const QString &message);
-    void openAsset(const Aurora::ImmichAsset &asset);
     void handleAssetInfoLoaded(const Aurora::ImmichAsset &asset);
     void handleAssetInfoFailed(const QString &assetId, const QString &message);
     void pasteFromClipboard();
@@ -145,6 +145,7 @@ private:
     void updateSearchOptionsUi();
     ImmichAsset currentAssetForClipboard() const;
     void promptDownload(const Aurora::ImmichAsset &asset);
+    MediaViewerDialog *openAsset(const Aurora::ImmichAsset &asset);
     ImmichAsset adjacentAsset(const QString &assetId, int step);
     void confirmAndDelete(const Aurora::ImmichAsset &asset, bool permanent);
     void removeAssetsFromTimeline(const QStringList &assetIds);
