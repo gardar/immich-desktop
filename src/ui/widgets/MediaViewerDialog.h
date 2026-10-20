@@ -11,6 +11,7 @@ class QStackedWidget;
 
 namespace Aurora {
 
+class AssetInfoPanel;
 class ThemeManager;
 class VideoPlayerWidget;
 class ZoomPanWidget;
@@ -27,12 +28,16 @@ public:
                       QWidget *parent = nullptr);
 
     void updateNavigation();
+    void setInfoPanelVisible(bool visible);
 
 signals:
     void copyRequested(const Aurora::ImmichAsset &asset);
     void downloadRequested(const Aurora::ImmichAsset &asset);
     void trashRequested(const Aurora::ImmichAsset &asset);
     void deleteRequested(const Aurora::ImmichAsset &asset);
+    void personRequested(const Aurora::ImmichPerson &person);
+    void placeRequested(const QString &city);
+    void dateRequested(const QDate &date);
 
 private:
     void setAsset(const ImmichAsset &asset, bool autoplay = false);
@@ -51,6 +56,8 @@ private:
     QPushButton *m_previousButton;
     QPushButton *m_nextButton;
     QPushButton *m_copyButton;
+    QPushButton *m_infoButton;
+    AssetInfoPanel *m_infoPanel;
 };
 
 } // namespace Aurora

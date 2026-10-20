@@ -35,25 +35,6 @@ namespace {
 constexpr int kSidePad = 16;
 constexpr int kGap = 4;
 
-QPixmap circularPixmap(const QPixmap &source, const QSize &size)
-{
-    if (source.isNull() || !size.isValid() || size.width() <= 0 || size.height() <= 0)
-        return {};
-    const QPixmap scaled =
-        source.scaled(size, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
-    QPixmap circular(size);
-    circular.fill(Qt::transparent);
-    QPainter painter(&circular);
-    painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
-    QPainterPath path;
-    path.addEllipse(QRect(QPoint(0, 0), size));
-    painter.setClipPath(path);
-    const int x = qMax(0, (scaled.width() - size.width()) / 2);
-    const int y = qMax(0, (scaled.height() - size.height()) / 2);
-    painter.drawPixmap(0, 0, scaled, x, y, size.width(), size.height());
-    return circular;
-}
 } // namespace
 
 ExploreCard::ExploreCard(Style style, QWidget *parent)

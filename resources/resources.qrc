@@ -42,6 +42,7 @@
         <file alias="icons/play.svg">icons/play.svg</file>
         <file alias="icons/refresh-cw.svg">icons/refresh-cw.svg</file>
         <file alias="icons/settings.svg">icons/settings.svg</file>
+        <file alias="icons/share.svg">icons/share.svg</file>
         <file alias="icons/server.svg">icons/server.svg</file>
         <file alias="icons/square.svg">icons/square.svg</file>
         <file alias="icons/star.svg">icons/star.svg</file>
@@ -49,6 +50,13 @@
         <file alias="icons/x.svg">icons/x.svg</file>
         <file alias="icons/tabler/arrow-left.svg">icons/tabler/arrow-left.svg</file>
         <file alias="icons/tabler/calendar.svg">icons/tabler/calendar.svg</file>
+        <file alias="icons/tabler/book-image.svg">icons/tabler/book-image.svg</file>
+        <file alias="icons/tabler/camera.svg">icons/tabler/camera.svg</file>
+        <file alias="icons/tabler/image.svg">icons/tabler/image.svg</file>
+        <file alias="icons/tabler/info.svg">icons/tabler/info.svg</file>
+        <file alias="icons/tabler/map-pin.svg">icons/tabler/map-pin.svg</file>
+        <file alias="icons/tabler/tag.svg">icons/tabler/tag.svg</file>
+        <file alias="icons/tabler/users.svg">icons/tabler/users.svg</file>
         <file alias="icons/tabler/chevron-down.svg">icons/tabler/chevron-down.svg</file>
         <file alias="icons/tabler/chevron-left.svg">icons/tabler/chevron-left.svg</file>
         <file alias="icons/tabler/chevron-right.svg">icons/tabler/chevron-right.svg</file>
@@ -77,6 +85,7 @@
         <file alias="icons/tabler/save.svg">icons/tabler/save.svg</file>
         <file alias="icons/tabler/server.svg">icons/tabler/server.svg</file>
         <file alias="icons/tabler/settings.svg">icons/tabler/settings.svg</file>
+        <file alias="icons/tabler/share.svg">icons/tabler/share.svg</file>
         <file alias="icons/tabler/square.svg">icons/tabler/square.svg</file>
         <file alias="icons/tabler/star.svg">icons/tabler/star.svg</file>
         <file alias="icons/tabler/trash.svg">icons/tabler/trash.svg</file>
@@ -85,6 +94,13 @@
         <file alias="icons/tabler/LICENSE.txt">icons/tabler/LICENSE.txt</file>
         <file alias="icons/bootstrap/arrow-left.svg">icons/bootstrap/arrow-left.svg</file>
         <file alias="icons/bootstrap/calendar.svg">icons/bootstrap/calendar.svg</file>
+        <file alias="icons/bootstrap/book-image.svg">icons/bootstrap/book-image.svg</file>
+        <file alias="icons/bootstrap/camera.svg">icons/bootstrap/camera.svg</file>
+        <file alias="icons/bootstrap/image.svg">icons/bootstrap/image.svg</file>
+        <file alias="icons/bootstrap/info.svg">icons/bootstrap/info.svg</file>
+        <file alias="icons/bootstrap/map-pin.svg">icons/bootstrap/map-pin.svg</file>
+        <file alias="icons/bootstrap/tag.svg">icons/bootstrap/tag.svg</file>
+        <file alias="icons/bootstrap/users.svg">icons/bootstrap/users.svg</file>
         <file alias="icons/bootstrap/chevron-down.svg">icons/bootstrap/chevron-down.svg</file>
         <file alias="icons/bootstrap/chevron-left.svg">icons/bootstrap/chevron-left.svg</file>
         <file alias="icons/bootstrap/chevron-right.svg">icons/bootstrap/chevron-right.svg</file>
@@ -111,6 +127,7 @@
         <file alias="icons/bootstrap/save.svg">icons/bootstrap/save.svg</file>
         <file alias="icons/bootstrap/server.svg">icons/bootstrap/server.svg</file>
         <file alias="icons/bootstrap/settings.svg">icons/bootstrap/settings.svg</file>
+        <file alias="icons/bootstrap/share.svg">icons/bootstrap/share.svg</file>
         <file alias="icons/bootstrap/square.svg">icons/bootstrap/square.svg</file>
         <file alias="icons/bootstrap/star.svg">icons/bootstrap/star.svg</file>
         <file alias="icons/bootstrap/trash.svg">icons/bootstrap/trash.svg</file>
@@ -119,6 +136,13 @@
         <file alias="icons/bootstrap/LICENSE.txt">icons/bootstrap/LICENSE.txt</file>
         <file alias="icons/trash.svg">icons/trash.svg</file>
         <file alias="icons/calendar.svg">icons/calendar.svg</file>
+        <file alias="icons/book-image.svg">icons/book-image.svg</file>
+        <file alias="icons/camera.svg">icons/camera.svg</file>
+        <file alias="icons/image.svg">icons/image.svg</file>
+        <file alias="icons/info.svg">icons/info.svg</file>
+        <file alias="icons/map-pin.svg">icons/map-pin.svg</file>
+        <file alias="icons/tag.svg">icons/tag.svg</file>
+        <file alias="icons/users.svg">icons/users.svg</file>
         <file alias="icons/folder.svg">icons/folder.svg</file>
         <file alias="icons/save.svg">icons/save.svg</file>
         <file alias="icons/external-link.svg">icons/external-link.svg</file>

@@ -1,6 +1,8 @@
 #include "ui/widgets/MediaViewerDialog.h"
 
+#include "core/AppSettings.h"
 #include "ui/widgets/AnimatedButton.h"
+#include "ui/widgets/AssetInfoPanel.h"
 #include "ui/widgets/ShareLinkDialog.h"
 #include "ui/widgets/VideoPlayerWidget.h"
 #include "ui/widgets/ZoomPanWidget.h"
@@ -23,6 +25,7 @@ MediaViewerDialog::MediaViewerDialog(ThemeManager *themeManager, ImmichClient *c
     , m_stack(new QStackedWidget(this))
     , m_preview(new ZoomPanWidget(this))
     , m_videoPlayer(new VideoPlayerWidget(client, this))
+    , m_infoPanel(new AssetInfoPanel(client, this))
 {
     setAttribute(Qt::WA_DeleteOnClose);
     setAttribute(Qt::WA_StyledBackground, true);
@@ -46,6 +49,9 @@ MediaViewerDialog::MediaViewerDialog(ThemeManager *themeManager, ImmichClient *c
     auto *trashButton = makeButton(tr("Move to trash"), QStringLiteral(":/icons/trash.svg"));
     auto *deleteButton =
         makeButton(tr("Delete permanently"), QStringLiteral(":/icons/circle-x.svg"));
+    m_infoButton = makeButton(tr("Info"), QStringLiteral(":/icons/info.svg"));
+    m_infoButton->setCheckable(true);
+    m_infoButton->setToolTip(tr("Show info (I)"));
     auto *closeButton = makeButton(tr("Close"), QStringLiteral(":/icons/x.svg"));
     m_previousButton->setToolTip(tr("Previous (Left arrow)"));
     m_nextButton->setToolTip(tr("Next (Right arrow)"));
@@ -59,10 +65,16 @@ MediaViewerDialog::MediaViewerDialog(ThemeManager *themeManager, ImmichClient *c
     controls->addWidget(shareButton);
     controls->addWidget(trashButton);
     controls->addWidget(deleteButton);
+    controls->addWidget(m_infoButton);
     controls->addWidget(closeButton);
 
+    auto *content = new QHBoxLayout;
+    content->setSpacing(0);
+    content->addWidget(m_stack, 1);
+    content->addWidget(m_infoPanel);
+
     auto *layout = new QVBoxLayout(this);
-    layout->addWidget(m_stack, 1);
+    layout->addLayout(content, 1);
     layout->addLayout(controls);
 
     connect(m_previousButton, &QPushButton::clicked, this, [this] { step(-1); });
@@ -76,11 +88,32 @@ MediaViewerDialog::MediaViewerDialog(ThemeManager *themeManager, ImmichClient *c
     connect(deleteButton, &QPushButton::clicked, this,
             [this] { emit deleteRequested(m_asset); });
     connect(closeButton, &QPushButton::clicked, this, &QDialog::reject);
+    connect(m_infoButton, &QPushButton::toggled, this, [this](bool open) {
+        setInfoPanelVisible(open);
+        WindowSettings window = AppSettings().loadWindow();
+        window.viewerInfoOpen = open;
+        AppSettings().saveWindow(window);
+    });
+    connect(m_infoPanel, &AssetInfoPanel::closeRequested, m_infoButton,
+            [this] { m_infoButton->setChecked(false); });
+    connect(m_infoPanel, &AssetInfoPanel::personRequested, this,
+            &MediaViewerDialog::personRequested);
+    connect(m_infoPanel, &AssetInfoPanel::placeRequested, this,
+            &MediaViewerDialog::placeRequested);
+    connect(m_infoPanel, &AssetInfoPanel::dateRequested, this,
+            &MediaViewerDialog::dateRequested);
+    connect(m_client, &ImmichClient::assetDetailsLoaded, this,
+            [this](const ImmichAssetDetails &details) {
+                if (details.asset.id == m_asset.id && !details.asset.fileName.isEmpty())
+                    setWindowTitle(details.asset.fileName);
+            });
 
     auto *previousShortcut = new QShortcut(QKeySequence(Qt::Key_Left), this);
     connect(previousShortcut, &QShortcut::activated, this, [this] { step(-1); });
     auto *nextShortcut = new QShortcut(QKeySequence(Qt::Key_Right), this);
     connect(nextShortcut, &QShortcut::activated, this, [this] { step(1); });
+    auto *infoShortcut = new QShortcut(QKeySequence(Qt::Key_I), this);
+    connect(infoShortcut, &QShortcut::activated, m_infoButton, &QPushButton::toggle);
 
     connect(m_client, &ImmichClient::previewLoaded, this,
             [this](const QString &assetId, const QPixmap &pixmap) {
@@ -106,6 +139,7 @@ MediaViewerDialog::MediaViewerDialog(ThemeManager *themeManager, ImmichClient *c
 
     // Only the item opened from the grid autoplays; videos reached by browsing wait.
     setAsset(asset, asset.isVideo());
+    setInfoPanelVisible(AppSettings().loadWindow().viewerInfoOpen);
 }
 
 void MediaViewerDialog::updateNavigation()
@@ -135,7 +169,14 @@ void MediaViewerDialog::setAsset(const ImmichAsset &asset, bool autoplay)
         m_stack->setCurrentWidget(m_preview);
     }
     m_client->loadPreview(asset.id);
+    m_infoPanel->setAsset(asset);
     updateNavigation();
+}
+
+void MediaViewerDialog::setInfoPanelVisible(bool visible)
+{
+    m_infoPanel->setVisible(visible);
+    m_infoButton->setChecked(visible);
 }
 
 void MediaViewerDialog::step(int direction)

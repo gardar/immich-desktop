@@ -39,6 +39,7 @@ struct WindowSettings {
     bool closeToTray = true;
     bool autoStart = false;
     bool sidebarCollapsed = false;
+    bool viewerInfoOpen = false;
 };
 
 struct PlaybackSettings {
