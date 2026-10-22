@@ -71,6 +71,14 @@ if (-not (Test-Path $qtCMakeDir)) {
 $env:CMAKE_PREFIX_PATH = $qtRoot
 
 if (-not $NoBuild) {
+    # Linker can't overwrite immich.exe while a previous run still holds it open.
+    $running = Get-Process -Name immich -ErrorAction SilentlyContinue
+    if ($running) {
+        Write-Host "Stopping running immich (PID $($running.Id -join ', ')) so the build can replace immich.exe..."
+        $running | Stop-Process -Force
+        Start-Sleep -Milliseconds 800
+    }
+
     $mingwRoot = Get-ChildItem "C:\Qt\Tools" -Directory -Filter "mingw*_64" |
         Sort-Object Name -Descending |
         Select-Object -First 1
