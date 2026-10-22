@@ -151,6 +151,9 @@ ExplorePage::ExplorePage(ThemeManager *themeManager, ImmichClient *client, QWidg
     toolbarLayout->addLayout(headingColumn, 1);
     m_refreshButton = new QPushButton(tr("Refresh"), toolbar);
     configureActionButton(m_refreshButton, QStringLiteral(":/icons/refresh-cw.svg"));
+    setActionButtonLabel(m_refreshButton, QString());
+    m_refreshButton->setToolTip(tr("Refresh"));
+    m_refreshButton->setAccessibleName(tr("Refresh"));
     toolbarLayout->addWidget(m_refreshButton);
 
     m_browseScroll = new QScrollArea(m_browsePage);
@@ -237,6 +240,7 @@ ExplorePage::ExplorePage(ThemeManager *themeManager, ImmichClient *client, QWidg
     collectionToolbarLayout->addLayout(collectionText, 1);
     m_collectionZoomSlider = new ZoomSlider(collectionToolbar);
     m_collectionZoomSlider->setValue(m_collectionTileSize);
+    m_collectionZoomSlider->setCompact(true);
     collectionToolbarLayout->addWidget(m_collectionZoomSlider);
     connect(m_collectionZoomSlider, &ZoomSlider::valueChanged, this,
             &ExplorePage::setCollectionTileSize);
@@ -398,11 +402,7 @@ void ExplorePage::releaseUiPixmaps()
 void ExplorePage::resizeEvent(QResizeEvent *event)
 {
     QWidget::resizeEvent(event);
-    QWidget *collectionToolbar = m_collectionZoomSlider->parentWidget();
-    m_collectionZoomSlider->setCompact(false);
-    collectionToolbar->layout()->activate();
-    m_collectionZoomSlider->setCompact(collectionToolbar->layout()->minimumSize().width() >
-                                       collectionToolbar->width());
+    m_collectionZoomSlider->setCompact(true);
     if (m_stack->currentIndex() == static_cast<int>(Page::Collection))
         scheduleCollectionLayout();
 }
