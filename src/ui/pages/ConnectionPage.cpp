@@ -53,7 +53,8 @@ ConnectionPage::ConnectionPage(ImmichClient *client, QWidget *parent)
     auto *description = new QLabel(
         tr("Connect this desktop client to your Immich instance. The API key needs "
            "user.read, asset.read, asset.view, asset.upload, asset.download, "
-           "asset.delete, and person.read permissions. An optional local URL is "
+           "asset.delete, and person.read permissions; album.read is optional and lists a "
+           "photo's albums. An optional local URL is "
            "preferred automatically when reachable."),
         card);
     description->setProperty("subheading", true);

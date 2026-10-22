@@ -35,25 +35,6 @@ namespace {
 constexpr int kSidePad = 16;
 constexpr int kGap = 4;
 
-QPixmap circularPixmap(const QPixmap &source, const QSize &size)
-{
-    if (source.isNull() || !size.isValid() || size.width() <= 0 || size.height() <= 0)
-        return {};
-    const QPixmap scaled =
-        source.scaled(size, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
-    QPixmap circular(size);
-    circular.fill(Qt::transparent);
-    QPainter painter(&circular);
-    painter.setRenderHint(QPainter::Antialiasing, true);
-    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
-    QPainterPath path;
-    path.addEllipse(QRect(QPoint(0, 0), size));
-    painter.setClipPath(path);
-    const int x = qMax(0, (scaled.width() - size.width()) / 2);
-    const int y = qMax(0, (scaled.height() - size.height()) / 2);
-    painter.drawPixmap(0, 0, scaled, x, y, size.width(), size.height());
-    return circular;
-}
 } // namespace
 
 ExploreCard::ExploreCard(Style style, QWidget *parent)
@@ -661,6 +642,16 @@ void ExplorePage::openPerson(const ImmichPerson &person)
     m_client->loadAssetsForPerson(person.id);
 }
 
+void ExplorePage::showPerson(const ImmichPerson &person)
+{
+    openPerson(person);
+}
+
+void ExplorePage::showPlace(const QString &city)
+{
+    openPlace(ImmichPlace{city, {}});
+}
+
 void ExplorePage::openPlace(const ImmichPlace &place)
 {
     m_pendingCollectionTitle = place.city;
@@ -839,6 +830,9 @@ void ExplorePage::appendCollectionAssets(const QList<ImmichAsset> &assets)
         m_collectionTiles.insert(asset.id, tile);
         connect(tile, &MediaTile::activated, this,
                 [this, asset] { openAsset(asset, true); });
+        connect(tile, &MediaTile::infoRequested, this, [this, asset] {
+            openAsset(asset, true)->setInfoPanelVisible(true);
+        });
         connect(tile, &MediaTile::shareRequested, this, [this](const ImmichAsset &asset) {
             (new ShareLinkDialog(m_client, asset, this))->show();
         });
@@ -1048,7 +1042,7 @@ void ExplorePage::backToBrowse()
     updateEmptyState();
 }
 
-void ExplorePage::openAsset(const ImmichAsset &asset, bool fromCollection)
+MediaViewerDialog *ExplorePage::openAsset(const ImmichAsset &asset, bool fromCollection)
 {
     if (asset.isVideo() && m_collectionHoverPreview)
         m_collectionHoverPreview->stop();
@@ -1064,7 +1058,11 @@ void ExplorePage::openAsset(const ImmichAsset &asset, bool fromCollection)
             &ExplorePage::downloadRequested);
     connect(viewer, &MediaViewerDialog::trashRequested, this, &ExplorePage::trashRequested);
     connect(viewer, &MediaViewerDialog::deleteRequested, this, &ExplorePage::deleteRequested);
+    connect(viewer, &MediaViewerDialog::personRequested, this, &ExplorePage::personRequested);
+    connect(viewer, &MediaViewerDialog::placeRequested, this, &ExplorePage::placeRequested);
+    connect(viewer, &MediaViewerDialog::dateRequested, this, &ExplorePage::dateRequested);
     viewer->show();
+    return viewer;
 }
 
 ImmichAsset ExplorePage::adjacentAsset(bool fromCollection, const QString &assetId, int step)

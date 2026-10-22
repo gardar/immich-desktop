@@ -200,6 +200,8 @@ WindowSettings AppSettings::loadWindow() const
         m_settings.value(QStringLiteral("window/autoStart"), false).toBool();
     result.sidebarCollapsed =
         m_settings.value(QStringLiteral("window/sidebarCollapsed"), false).toBool();
+    result.viewerInfoOpen =
+        m_settings.value(QStringLiteral("window/viewerInfoOpen"), false).toBool();
     return result;
 }
 
@@ -208,6 +210,7 @@ void AppSettings::saveWindow(const WindowSettings &window)
     m_settings.setValue(QStringLiteral("window/closeToTray"), window.closeToTray);
     m_settings.setValue(QStringLiteral("window/autoStart"), window.autoStart);
     m_settings.setValue(QStringLiteral("window/sidebarCollapsed"), window.sidebarCollapsed);
+    m_settings.setValue(QStringLiteral("window/viewerInfoOpen"), window.viewerInfoOpen);
     m_settings.sync();
 }
 

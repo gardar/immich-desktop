@@ -3,6 +3,7 @@
 #include <QDateTime>
 #include <QList>
 #include <QString>
+#include <QStringList>
 
 namespace Aurora {
 
@@ -34,6 +35,35 @@ struct ImmichPerson {
     QString name;
     bool favorite = false;
     bool hidden = false;
+};
+
+struct ImmichAssetDetails {
+    ImmichAsset asset;
+    QDateTime localDateTime; // Wall-clock time where the photo was taken, held as UTC.
+    QString timeZone;
+    int width = 0;
+    int height = 0;
+    qint64 fileSize = 0;
+    QString make;
+    QString model;
+    QString lens;
+    double fNumber = 0.0;
+    double focalLength = 0.0;
+    int iso = 0;
+    QString exposureTime;
+    bool hasLocation = false;
+    double latitude = 0.0;
+    double longitude = 0.0;
+    QString city;
+    QString state;
+    QString country;
+    QString description;
+    QString folder;
+    QList<ImmichPerson> people;
+    QStringList tags;
+    QString ownerId;
+    QString ownerName;
+    bool sharedByOtherUser = false;
 };
 
 struct ImmichPlace {

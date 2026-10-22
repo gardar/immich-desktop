@@ -37,6 +37,7 @@ namespace Aurora {
 class ThemeManager;
 class FolderSyncService;
 class MediaTile;
+class MediaViewerDialog;
 class SummaryTile;
 class VideoHoverPreview;
 class ZoomSlider;
@@ -50,7 +51,13 @@ public:
     void setCompactGrid(bool enabled);
     void setTileSize(int size);
 
+signals:
+    void personRequested(const Aurora::ImmichPerson &person);
+    void placeRequested(const QString &city);
+    void dateRequested(const QDate &date);
+
 public slots:
+    void showDay(const QDate &day);
     void copyAsset(const Aurora::ImmichAsset &asset);
     void downloadAsset(const Aurora::ImmichAsset &asset);
     void trashAsset(const Aurora::ImmichAsset &asset);
@@ -79,7 +86,6 @@ private slots:
     void showThumbnailError(const QString &assetId, const QString &resultSize,
                             const QString &message);
     void showRequestError(const QString &operation, const QString &message);
-    void openAsset(const Aurora::ImmichAsset &asset);
     void handleAssetInfoLoaded(const Aurora::ImmichAsset &asset);
     void handleAssetInfoFailed(const QString &assetId, const QString &message);
     void pasteFromClipboard();
@@ -134,10 +140,12 @@ private:
     QJsonObject searchOptions() const;
     void updateSearchExpansion();
     void updateToolbarDensity();
+    void resetSearchFilters();
     void animateSearchPanel(bool open);
     void updateSearchOptionsUi();
     ImmichAsset currentAssetForClipboard() const;
     void promptDownload(const Aurora::ImmichAsset &asset);
+    MediaViewerDialog *openAsset(const Aurora::ImmichAsset &asset);
     ImmichAsset adjacentAsset(const QString &assetId, int step);
     void confirmAndDelete(const Aurora::ImmichAsset &asset, bool permanent);
     void removeAssetsFromTimeline(const QStringList &assetIds);
@@ -225,6 +233,7 @@ private:
     QList<TimeBucketInfo> m_monthBuckets;
     int m_nextBucketIndex = 0;
     QDate m_pendingScrollToDate;
+    QDate m_pendingDay;
     int m_jumpTargetBucketIndex = -1;
 
     // Year grid state.

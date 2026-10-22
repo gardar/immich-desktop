@@ -498,16 +498,7 @@ LibraryPage::LibraryPage(ThemeManager *themeManager, ImmichClient *client,
         m_searchDateTo->setEnabled(enabled);
         optionsChanged();
     });
-    connect(resetSearch, &QPushButton::clicked, this, [this] {
-        m_resettingSearchOptions = true;
-        for (auto *field : {m_searchScope, m_searchPerson, m_searchMedia, m_searchMode})
-            field->setCurrentIndex(0);
-        m_searchPlace->clear();
-        m_searchDateEnabled->setChecked(false);
-        m_resettingSearchOptions = false;
-        m_searchDebounce->stop();
-        applySearch();
-    });
+    connect(resetSearch, &QPushButton::clicked, this, &LibraryPage::resetSearchFilters);
     connect(m_client, &ImmichClient::exploreLoaded, this, [this](const ImmichExploreData &data) {
         const QString selected = m_searchPerson->currentData().toString();
         const QSignalBlocker blocker(m_searchPerson);
@@ -789,6 +780,32 @@ void LibraryPage::updateSearchExpansion()
     updateToolbarDensity();
 }
 
+void LibraryPage::resetSearchFilters()
+{
+    m_resettingSearchOptions = true;
+    for (auto *field : {m_searchScope, m_searchPerson, m_searchMedia, m_searchMode})
+        field->setCurrentIndex(0);
+    m_searchPlace->clear();
+    m_searchDateEnabled->setChecked(false);
+    m_resettingSearchOptions = false;
+    m_searchDebounce->stop();
+    applySearch();
+}
+
+void LibraryPage::showDay(const QDate &day)
+{
+    if (m_searchActive || m_monthBuckets.isEmpty()) {
+        // Jump once the timeline's month list has (re)loaded.
+        m_pendingDay = day;
+        if (m_searchActive) {
+            m_searchField->clear();
+            resetSearchFilters();
+        }
+        return;
+    }
+    jumpToDate(day);
+}
+
 void LibraryPage::updateToolbarDensity()
 {
     const QWidget *toolbar = m_searchToolbarLayout->parentWidget();
@@ -991,6 +1008,10 @@ void LibraryPage::appendAssetsToTimeline(const QList<ImmichAsset> &assets)
         section->tiles.append(tile);
         m_tilesById.insert(asset.id, tile);
         connect(tile, &MediaTile::activated, this, &LibraryPage::openAsset);
+        connect(tile, &MediaTile::infoRequested, this, [this](const ImmichAsset &asset) {
+            if (MediaViewerDialog *viewer = openAsset(asset))
+                viewer->setInfoPanelVisible(true);
+        });
         connect(tile, &MediaTile::highlighted, this, [this](const ImmichAsset &asset) {
             m_currentAsset = asset;
         });
@@ -1112,6 +1133,11 @@ void LibraryPage::handleTimelineBucketsLoaded(const QList<TimeBucketInfo> &bucke
 
     m_monthBuckets = buckets;
     m_nextBucketIndex = 0;
+
+    if (m_pendingDay.isValid() && !m_monthBuckets.isEmpty()) {
+        jumpToDate(std::exchange(m_pendingDay, QDate()));
+        return;
+    }
 
     if (m_monthBuckets.isEmpty()) {
         m_loading = false;
@@ -1908,13 +1934,13 @@ void LibraryPage::handleUploadQueueChanged(int pendingCount)
     m_status->setText(tr("%n file(s) waiting to upload", nullptr, pendingCount));
 }
 
-void LibraryPage::openAsset(const ImmichAsset &asset)
+MediaViewerDialog *LibraryPage::openAsset(const ImmichAsset &asset)
 {
     m_currentAsset = asset;
     if (asset.isLocalPending()) {
         if (!asset.localPath.isEmpty())
             QDesktopServices::openUrl(QUrl::fromLocalFile(asset.localPath));
-        return;
+        return nullptr;
     }
     if (asset.isVideo() && m_videoHoverPreview)
         m_videoHoverPreview->stop();
@@ -1928,7 +1954,11 @@ void LibraryPage::openAsset(const ImmichAsset &asset)
     connect(viewer, &MediaViewerDialog::trashRequested, this, &LibraryPage::trashAsset);
     connect(viewer, &MediaViewerDialog::deleteRequested, this,
             &LibraryPage::deleteAssetPermanently);
+    connect(viewer, &MediaViewerDialog::personRequested, this, &LibraryPage::personRequested);
+    connect(viewer, &MediaViewerDialog::placeRequested, this, &LibraryPage::placeRequested);
+    connect(viewer, &MediaViewerDialog::dateRequested, this, &LibraryPage::dateRequested);
     viewer->show();
+    return viewer;
 }
 
 ImmichAsset LibraryPage::adjacentAsset(const QString &assetId, int step)

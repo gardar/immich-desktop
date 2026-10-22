@@ -89,6 +89,8 @@ set(IMMICH_SOURCES
     src/ui/widgets/AnimatedButton.h
     src/ui/widgets/AnimatedStackedWidget.cpp
     src/ui/widgets/AnimatedStackedWidget.h
+    src/ui/widgets/AssetInfoPanel.cpp
+    src/ui/widgets/AssetInfoPanel.h
     src/ui/widgets/ColorButton.cpp
     src/ui/widgets/ColorButton.h
     src/ui/widgets/MediaTile.cpp

@@ -130,6 +130,28 @@ MainWindow::MainWindow(ThemeManager *themeManager, UpdateManager *updateManager,
     connect(explorePage, &ExplorePage::trashRequested, libraryPage, &LibraryPage::trashAsset);
     connect(explorePage, &ExplorePage::deleteRequested, libraryPage,
             &LibraryPage::deleteAssetPermanently);
+    // Links in the viewer's info panel lead back into the main window.
+    auto showPerson = [this, explorePage](const ImmichPerson &person) {
+        explorePage->showPerson(person);
+        selectPage(1);
+        raiseToFront();
+    };
+    auto showPlace = [this, explorePage](const QString &city) {
+        explorePage->showPlace(city);
+        selectPage(1);
+        raiseToFront();
+    };
+    auto showDay = [this, libraryPage](const QDate &day) {
+        selectPage(0);
+        libraryPage->showDay(day);
+        raiseToFront();
+    };
+    connect(libraryPage, &LibraryPage::personRequested, this, showPerson);
+    connect(explorePage, &ExplorePage::personRequested, this, showPerson);
+    connect(libraryPage, &LibraryPage::placeRequested, this, showPlace);
+    connect(explorePage, &ExplorePage::placeRequested, this, showPlace);
+    connect(libraryPage, &LibraryPage::dateRequested, this, showDay);
+    connect(explorePage, &ExplorePage::dateRequested, this, showDay);
     m_pages->addWidget(libraryPage);
     m_pages->addWidget(explorePage);
     m_pages->addWidget(m_settingsPage);

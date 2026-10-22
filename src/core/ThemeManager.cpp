@@ -190,6 +190,31 @@ QString ThemeManager::buildStyleSheet() const
             border-radius: 36px;
         }
         QPushButton#videoOverlayButton:hover { background: rgba(0, 0, 0, 190); }
+        QPushButton[linkButton="true"] {
+            background: transparent;
+            border: none;
+            padding: 0;
+            color: %7;
+            text-align: left;
+        }
+        QPushButton[linkButton="true"]:hover { text-decoration: underline; }
+        QPushButton[personButton="true"] {
+            background: transparent;
+            border: none;
+            border-radius: 10px;
+            padding: 0;
+        }
+        QPushButton[personButton="true"]:hover { background: %6; }
+        QLabel#personAvatar {
+            background: %6;
+            border-radius: 24px;
+            font-weight: 600;
+        }
+        QLabel#mapPlaceholder {
+            border: 1px dashed %4;
+            border-radius: 10px;
+        }
+        QFrame#assetInfoPanel { border-left: 1px solid %4; }
         QDialogButtonBox QPushButton { min-width: 88px; }
         QComboBox, QLineEdit, QSpinBox, QDoubleSpinBox, QDateEdit {
             background: %6;

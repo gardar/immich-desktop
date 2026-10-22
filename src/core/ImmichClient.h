@@ -70,6 +70,7 @@ public:
                        const QString &suggestedFileName = {});
     void fetchAssetOriginal(const QString &assetId);
     void fetchAssetInfo(const QString &assetId);
+    void fetchAssetDetails(const QString &assetId);
     void deleteAssets(const QStringList &assetIds, bool permanent = false);
     void createSharedLink(const QString &assetId, const QUuid &requestId, const QString &password = {});
     QUrl sharedLinkUrl(const QString &key) const;
@@ -109,6 +110,10 @@ signals:
     void assetDownloaded(const QString &assetId, const QString &destinationPath);
     void assetInfoLoaded(const Aurora::ImmichAsset &asset);
     void assetInfoFailed(const QString &assetId, const QString &message);
+    void assetDetailsLoaded(const Aurora::ImmichAssetDetails &details);
+    void assetDetailsFailed(const QString &assetId, const QString &message);
+    void assetAlbumsLoaded(const QString &assetId, const QStringList &albumNames);
+    void assetAlbumsFailed(const QString &assetId, bool permissionDenied);
     void assetOriginalFetched(const QString &assetId, const QByteArray &bytes,
                               const QString &contentType);
     void assetsDeleted(const QStringList &assetIds, bool permanent);
@@ -150,6 +155,7 @@ private:
     void setOnline(bool online);
     void setActiveServerUrl(const QString &url, bool usingLocal);
     void finishConnectionTest();
+    void requestAssetDetails(const QString &assetId);
     void setupNetworkMonitoring();
     void rebuildSslConfig();
     QString effectivePassword() const;
@@ -157,6 +163,7 @@ private:
 
     AppSettings m_store;
     ImmichConnectionSettings m_connection;
+    QString m_currentUserId;
     QString m_activeServerUrl;
     QSslConfiguration m_sslConfig;
     QString m_sessionKeyPassword;
