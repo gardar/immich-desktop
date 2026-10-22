@@ -14,6 +14,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QUrl>
 #include <QVBoxLayout>
 
@@ -39,10 +40,19 @@ ConnectionPage::ConnectionPage(ImmichClient *client, QWidget *parent)
 {
     configureActionButton(m_saveButton, QStringLiteral(":/icons/save.svg"));
     auto *root = new QVBoxLayout(this);
-    root->setContentsMargins(0, 12, 0, 0);
-    root->setSpacing(14);
+    root->setContentsMargins(0, 0, 0, 0);
+    root->setSpacing(0);
 
-    auto *card = new QFrame(this);
+    auto *scroll = new QScrollArea(this);
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    auto *scrollContent = new QWidget(scroll);
+    auto *scrollLayout = new QVBoxLayout(scrollContent);
+    scrollLayout->setContentsMargins(0, 12, 8, 12);
+    scrollLayout->setSpacing(14);
+
+    auto *card = new QFrame(scrollContent);
     card->setProperty("card", true);
     auto *cardLayout = new QVBoxLayout(card);
     cardLayout->setContentsMargins(22, 20, 22, 22);
@@ -187,8 +197,10 @@ ConnectionPage::ConnectionPage(ImmichClient *client, QWidget *parent)
     cardLayout->addLayout(form);
     cardLayout->addWidget(privacy);
     cardLayout->addLayout(actions);
-    root->addWidget(card);
-    root->addStretch();
+    scrollLayout->addWidget(card);
+    scrollLayout->addStretch();
+    scroll->setWidget(scrollContent);
+    root->addWidget(scroll, 1);
 
     connect(m_saveButton, &QPushButton::clicked, this, &ConnectionPage::saveAndTest);
     connect(m_serverUrl, &QLineEdit::returnPressed, this, &ConnectionPage::saveAndTest);
