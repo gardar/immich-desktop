@@ -135,6 +135,28 @@ Ways to help right now: bug fixes, UX polish, Immich API coverage (albums, shari
 - `resources` - icons, fonts, desktop metadata
 - `snap` - Snap packaging
 
+## Beta / nightly builds
+
+Every push to `main` rebuilds installers for all platforms and refreshes a rolling
+[**beta** prerelease](https://github.com/hdmain/immich-desktop/releases/tag/beta)
+(Windows `.exe` / `.msi`, Linux `.deb` / AppImage for `x86_64` + `aarch64`, and Snap).
+Snap Store also gets those builds on the `beta` and `edge` channels:
+
+```bash
+sudo snap install immich-desktop --beta
+# or
+sudo snap install immich-desktop --edge
+```
+
+Prefer the [latest stable release](https://github.com/hdmain/immich-desktop/releases/latest)
+for day-to-day use. Beta builds can break.
+
+| Platform | Download |
+| --- | --- |
+| All packages (latest beta) | [github.com/hdmain/immich-desktop/releases/tag/beta](https://github.com/hdmain/immich-desktop/releases/tag/beta) |
+| Snap (`beta`) | `sudo snap install immich-desktop --beta` |
+| Snap (`edge`) | `sudo snap install immich-desktop --edge` |
+
 ## License
 
 MIT - see [LICENSE.txt](LICENSE.txt).

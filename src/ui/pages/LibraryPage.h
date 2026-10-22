@@ -231,10 +231,12 @@ private:
     QHash<QString, int> m_requestedTileImages;
     QList<ImmichAsset> m_assets;
     QList<TimeBucketInfo> m_monthBuckets;
+    // Collect metadata for the whole timeline before exposing its scroll range.
+    // Thumbnail requests remain limited to the visible viewport.
+    QList<ImmichAsset> m_timelineIndexAssets;
     int m_nextBucketIndex = 0;
     QDate m_pendingScrollToDate;
     QDate m_pendingDay;
-    int m_jumpTargetBucketIndex = -1;
 
     // Year grid state.
     QList<YearSummary> m_yearSummaries;

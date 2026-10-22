@@ -189,7 +189,7 @@ jobs:
           path: ${{ steps.build.outputs.snap }}
           if-no-files-found: error
 
-      - name: Publish snap to Snap Store
+      - name: Publish snap to Snap Store (stable + all channels)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: snapcore/action-publish@v1
         env:
@@ -199,6 +199,94 @@ jobs:
           # Publish to every risk level so Ubuntu USN rebuilds clear
           # edge/candidate/beta as well as stable.
           release: stable,candidate,beta,edge
+
+      - name: Publish snap to Snap Store (beta / edge)
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        uses: snapcore/action-publish@v1
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        with:
+          snap: ${{ steps.build.outputs.snap }}
+          release: beta,edge
+
+  beta:
+    name: Publish beta release
+    # Rolling prerelease: every push to main rebuilds installers for all
+    # platforms and replaces the GitHub "beta" release.
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    needs:
+      - windows
+      - linux
+      - snap
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Download installers
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Write beta release notes
+        shell: bash
+        run: |
+          python3 <<'PY'
+          import json
+          import pathlib
+          from datetime import datetime, timezone
+
+          sha = "${{ github.sha }}"
+          short = sha[:7]
+          version = ""
+          notes = ""
+          path = pathlib.Path("changelog.json")
+          if path.is_file():
+              data = json.loads(path.read_text(encoding="utf-8"))
+              version = str(data.get("version", "")).strip()
+              notes = str(data.get("what_changed", "")).strip()
+
+          stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+          lines = [
+              f"**Rolling beta** built from `main` at `{short}` ({stamp}).",
+              "",
+              "This is an automated prerelease. Prefer the [latest stable release](https://github.com/hdmain/immich-desktop/releases/latest) for day-to-day use.",
+              "",
+          ]
+          if version:
+              lines.append(f"Package version in this build: **{version}**.")
+              lines.append("")
+          if notes:
+              lines.append("### Current changelog")
+              lines.append("")
+              lines.append(notes)
+              lines.append("")
+          pathlib.Path("beta-notes.md").write_text("\n".join(lines), encoding="utf-8")
+          PY
+
+      - name: Replace previous beta release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete beta --yes --cleanup-tag || true
+
+      - name: Publish GitHub beta release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: beta
+          name: Beta (rolling)
+          body_path: beta-notes.md
+          prerelease: true
+          make_latest: false
+          target_commitish: ${{ github.sha }}
+          files: |
+            dist/*.exe
+            dist/*.msi
+            dist/*.deb
+            dist/*.AppImage
+            dist/*.snap
 
   release:
     name: Publish tagged release

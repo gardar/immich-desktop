@@ -644,8 +644,8 @@ void LibraryPage::refresh()
     }
 
     m_monthBuckets.clear();
+    m_timelineIndexAssets.clear();
     m_nextBucketIndex = 0;
-    m_jumpTargetBucketIndex = -1;
     m_pendingScrollToDate = QDate();
 
     if (!m_client->isOnline()) {
@@ -657,17 +657,17 @@ void LibraryPage::refresh()
     clearTimeline();
     syncPendingLocalAssets();
     m_loading = true;
+    updateEmptyState();
     m_refreshButton->setEnabled(false);
-    m_status->setText(tr("Loading your library…"));
+    m_status->setText(tr("Loading library index…"));
     // Keep the previous offline snapshot until a successful reload replaces it.
     m_client->loadTimelineBuckets();
 }
 
 bool LibraryPage::hasMoreToLoad() const
 {
-    if (m_searchActive)
-        return !m_nextPage.isEmpty();
-    return m_nextBucketIndex < m_monthBuckets.size();
+    // The library publishes a complete index; only search is paginated.
+    return m_searchActive && !m_nextPage.isEmpty();
 }
 
 void LibraryPage::loadMore()
@@ -683,7 +683,6 @@ void LibraryPage::loadMore()
         return;
     }
 
-    loadNextTimelineBucket();
 }
 
 void LibraryPage::maybeLoadMore()
@@ -1132,16 +1131,16 @@ void LibraryPage::handleTimelineBucketsLoaded(const QList<TimeBucketInfo> &bucke
         return;
 
     m_monthBuckets = buckets;
+    m_timelineIndexAssets.clear();
     m_nextBucketIndex = 0;
 
-    if (m_pendingDay.isValid() && !m_monthBuckets.isEmpty()) {
-        jumpToDate(std::exchange(m_pendingDay, QDate()));
-        return;
-    }
+    if (m_pendingDay.isValid())
+        m_pendingScrollToDate = std::exchange(m_pendingDay, QDate());
 
     if (m_monthBuckets.isEmpty()) {
         m_loading = false;
         m_refreshButton->setEnabled(true);
+        m_status->setText(tr("%n item(s)", nullptr, m_assets.size()));
         updateEmptyState();
         if (m_contentStack->currentIndex() == 1)
             showYearGrid();
@@ -1167,40 +1166,42 @@ void LibraryPage::handleTimelineBucketLoaded(const QDate &month,
     if (m_pendingYearCoverRequests.contains(month)) {
         const int year = m_pendingYearCoverRequests.take(month);
         handleYearCoverLoaded(year, assets);
-        return;
     }
     if (m_pendingYearDetailRequests.contains(month)) {
         const int year = m_pendingYearDetailRequests.take(month);
         handleYearDetailBucketLoaded(year, month, assets);
-        return;
     }
 
     if (m_searchActive)
         return;
     // Ignore a stale reply that no longer matches where the cursor is (e.g.
     // a refresh reset things while this request was in flight).
-    if (m_nextBucketIndex >= m_monthBuckets.size() ||
+    if (!m_loading || m_nextBucketIndex >= m_monthBuckets.size() ||
         m_monthBuckets.at(m_nextBucketIndex).month != month)
         return;
 
-    appendAssetsToTimeline(assets);
-    syncPendingLocalAssets();
+    m_timelineIndexAssets.append(assets);
     ++m_nextBucketIndex;
+    if (m_nextBucketIndex < m_monthBuckets.size()) {
+        m_status->setText(tr("Loading library index… %1/%2 months")
+                              .arg(m_nextBucketIndex).arg(m_monthBuckets.size()));
+        loadNextTimelineBucket();
+        return;
+    }
+
+    // A complete metadata index gives both grid modes their final geometry,
+    // including dates and aspect ratios, before the user starts scrolling.
+    // Loading thumbnails later must never extend the scroll range.
+    appendAssetsToTimeline(std::exchange(m_timelineIndexAssets, {}));
+    syncPendingLocalAssets();
     m_loading = false;
     m_refreshButton->setEnabled(true);
     m_status->setText(tr("%n item(s)", nullptr, m_assets.size()));
     updateEndpointHint();
-    scheduleLayout();
     updateEmptyState();
+    layoutTimeline();
+    scheduleLayout();
     updateAutoCheckTimer();
-
-    if (m_jumpTargetBucketIndex >= 0 && m_nextBucketIndex <= m_jumpTargetBucketIndex) {
-        // Still catching up to a jumpToDate() target - keep loading
-        // sequentially without waiting for the user to scroll.
-        loadNextTimelineBucket();
-        return;
-    }
-    m_jumpTargetBucketIndex = -1;
 
     if (m_pendingScrollToDate.isValid())
         QTimer::singleShot(60, this, &LibraryPage::scrollToPendingDate);
@@ -1209,19 +1210,24 @@ void LibraryPage::handleTimelineBucketLoaded(const QDate &month,
 
 void LibraryPage::handleTimelineBucketFailed(const QDate &month, const QString &message)
 {
-    if (m_pendingYearCoverRequests.remove(month) > 0)
-        return; // A missing cover thumbnail isn't worth surfacing as an error.
+    m_pendingYearCoverRequests.remove(month);
     if (m_pendingYearDetailRequests.contains(month)) {
         const int year = m_pendingYearDetailRequests.take(month);
         handleYearDetailBucketLoaded(year, month, {});
-        return;
     }
 
-    m_jumpTargetBucketIndex = -1;
+    if (m_searchActive || !m_loading || m_nextBucketIndex >= m_monthBuckets.size() ||
+        m_monthBuckets.at(m_nextBucketIndex).month != month)
+        return;
+
+    m_timelineIndexAssets.clear();
     m_pendingScrollToDate = QDate();
     m_loading = false;
     m_refreshButton->setEnabled(true);
-    m_status->setText(tr("Couldn't load more: %1").arg(message));
+    m_status->setText(tr("Couldn't load library index: %1. Refresh to retry.").arg(message));
+    updateEmptyState();
+    if (m_assets.isEmpty())
+        m_emptyState->setText(m_status->text());
 }
 
 QList<LibraryPage::YearSummary> LibraryPage::computeYearSummaries() const
@@ -1270,6 +1276,10 @@ void LibraryPage::showYearGrid()
 void LibraryPage::backToLibrary()
 {
     m_contentStack->setCurrentIndex(0);
+    if (!m_searchActive && !m_loading && m_nextBucketIndex < m_monthBuckets.size()) {
+        refresh();
+        return;
+    }
     updateEmptyState();
     scheduleVisibleMediaUpdate();
 }
@@ -1515,7 +1525,7 @@ void LibraryPage::jumpToDate(const QDate &day)
     if (index < 0)
         return;
 
-    if (index < m_nextBucketIndex) {
+    if (m_nextBucketIndex == m_monthBuckets.size()) {
         // Already loaded as part of the normal scroll - just scroll to it,
         // keeping everything else that's already on screen intact.
         m_pendingScrollToDate = day;
@@ -1523,15 +1533,13 @@ void LibraryPage::jumpToDate(const QDate &day)
         return;
     }
 
-    // Not loaded yet: keep whatever's already loaded and fetch sequentially
-    // from the current cursor through the target month, instead of wiping
-    // the timeline and starting over from just that one month.
-    m_jumpTargetBucketIndex = index;
+    // The index is loaded independently of scroll position. Remember this
+    // date and jump only after the full timeline has its final geometry.
     m_pendingScrollToDate = day;
-    m_loading = true;
-    m_refreshButton->setEnabled(false);
-    m_status->setText(tr("Loading…"));
-    loadNextTimelineBucket();
+    if (!m_loading) {
+        m_pendingDay = day;
+        refresh();
+    }
 }
 
 void LibraryPage::scrollToPendingDate()
@@ -1661,6 +1669,7 @@ void LibraryPage::clearTimeline()
     m_localAssetIds.clear();
     m_requestedThumbnails.clear();
     m_assets.clear();
+    m_timelineIndexAssets.clear();
     m_nextPage.clear();
     m_newestAssetId.clear();
 }
@@ -1866,6 +1875,10 @@ void LibraryPage::updateEmptyState()
         m_emptyState->setText(
             tr("Connect to your Immich server in Settings → Immich Server\n"
                "to browse photos and videos."));
+        return;
+    }
+    if (m_loading && !m_searchActive) {
+        m_emptyState->setText(tr("Loading library index…"));
         return;
     }
     if (m_searchActive) {
