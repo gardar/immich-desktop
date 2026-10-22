@@ -24,14 +24,19 @@ private slots:
     void showActiveEndpoint(bool usingLocal, const QString &activeUrl);
 
 private:
+    void updateClientCertVisibility();
+
     ImmichClient *m_client;
     QLineEdit *m_serverUrl;
     QLineEdit *m_localServerUrl;
     QLineEdit *m_apiKey;
+    QCheckBox *m_enableClientCert;
+    QWidget *m_clientCertFields = nullptr;
     QComboBox *m_certFormat;
     QLineEdit *m_clientCertPath;
     QLineEdit *m_clientKeyPath;
     QLabel *m_clientKeyLabel;
+    QWidget *m_clientKeyRow = nullptr;
     QLineEdit *m_caCertPath;
     QLineEdit *m_keyPassword;
     QCheckBox *m_rememberKeyPassword;

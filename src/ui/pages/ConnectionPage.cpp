@@ -28,6 +28,7 @@ ConnectionPage::ConnectionPage(ImmichClient *client, QWidget *parent)
     , m_serverUrl(new QLineEdit(this))
     , m_localServerUrl(new QLineEdit(this))
     , m_apiKey(new QLineEdit(this))
+    , m_enableClientCert(new QCheckBox(tr("Enable client certificate"), this))
     , m_certFormat(new QComboBox(this))
     , m_clientCertPath(new QLineEdit(this))
     , m_clientKeyPath(new QLineEdit(this))
@@ -83,6 +84,7 @@ ConnectionPage::ConnectionPage(ImmichClient *client, QWidget *parent)
     m_apiKey->setEchoMode(QLineEdit::Password);
     m_apiKey->setClearButtonEnabled(true);
 
+    m_enableClientCert->setChecked(current.hasClientCert());
     m_certFormat->addItem(tr("PKCS#12 (.p12/.pfx)"));
     m_certFormat->addItem(tr("PEM certificate + key"));
     m_certFormat->setCurrentIndex(static_cast<int>(current.certFormat));
@@ -125,26 +127,10 @@ ConnectionPage::ConnectionPage(ImmichClient *client, QWidget *parent)
                        ? tr("PKCS#12 bundles (*.p12 *.pfx)")
                        : pemFilter;
         });
-    auto *clientKeyRow =
-        makePathRow(m_clientKeyPath, tr("Select client key"),
-                    [pemFilter] { return pemFilter; });
+    m_clientKeyRow = makePathRow(m_clientKeyPath, tr("Select client key"),
+                                 [pemFilter] { return pemFilter; });
     auto *caCertRow = makePathRow(m_caCertPath, tr("Select CA certificate"),
                                   [pemFilter] { return pemFilter; });
-
-    // The client key only exists as a separate file in PEM mode; in PKCS#12 it
-    // lives inside the bundle, so hide the whole row (label + field + button)
-    // there. clientKeyRow is a container widget, so hiding it hides the Browse
-    // button too — hiding only the line edit would strand the button.
-    const auto applyKeyRowVisibility = [this, clientKeyRow] {
-        const bool pem = m_certFormat->currentIndex() == static_cast<int>(TlsCertFormat::Pem);
-        m_clientKeyLabel->setVisible(pem);
-        clientKeyRow->setVisible(pem);
-    };
-    connect(m_certFormat, &QComboBox::currentIndexChanged, this,
-            [applyKeyRowVisibility] { applyKeyRowVisibility(); });
-
-    auto *certTitle = new QLabel(tr("Client certificate (optional)"), card);
-    certTitle->setProperty("section", true);
 
     auto *form = new QFormLayout;
     form->setContentsMargins(0, 4, 0, 0);
@@ -153,23 +139,34 @@ ConnectionPage::ConnectionPage(ImmichClient *client, QWidget *parent)
     form->addRow(tr("Immich URL"), m_serverUrl);
     form->addRow(tr("Local URL"), m_localServerUrl);
     form->addRow(tr("API Key"), m_apiKey);
-    form->addRow(certTitle);
-    form->addRow(tr("Format"), m_certFormat);
-    form->addRow(tr("Client cert"), clientCertRow);
-    form->addRow(m_clientKeyLabel, clientKeyRow);
-    form->addRow(tr("Server CA"), caCertRow);
+    form->addRow(QString(), m_enableClientCert);
+
+    m_clientCertFields = new QWidget(card);
+    auto *certForm = new QFormLayout(m_clientCertFields);
+    certForm->setContentsMargins(0, 0, 0, 0);
+    certForm->setHorizontalSpacing(18);
+    certForm->setVerticalSpacing(12);
+    certForm->addRow(tr("Format"), m_certFormat);
+    certForm->addRow(tr("Client cert"), clientCertRow);
+    certForm->addRow(m_clientKeyLabel, m_clientKeyRow);
+    certForm->addRow(tr("Server CA"), caCertRow);
     auto *caHint = new QLabel(
         tr("Certificate that signed the server (or its reverse proxy). Needed when "
            "the server uses a private/internal CA. This is separate from the client "
            "certificate above and is not taken from the bundle."),
-        card);
+        m_clientCertFields);
     caHint->setWordWrap(true);
     caHint->setProperty("hint", true);
-    form->addRow(QString(), caHint);
-    form->addRow(tr("Key password"), m_keyPassword);
-    form->addRow(QString(), m_rememberKeyPassword);
+    certForm->addRow(QString(), caHint);
+    certForm->addRow(tr("Key password"), m_keyPassword);
+    certForm->addRow(QString(), m_rememberKeyPassword);
+    form->addRow(m_clientCertFields);
 
-    applyKeyRowVisibility();
+    connect(m_enableClientCert, &QCheckBox::toggled, this,
+            &ConnectionPage::updateClientCertVisibility);
+    connect(m_certFormat, &QComboBox::currentIndexChanged, this,
+            &ConnectionPage::updateClientCertVisibility);
+    updateClientCertVisibility();
 
     auto *privacy = new QLabel(
         tr("The API key is stored locally in this app's settings and is never sent "
@@ -234,12 +231,14 @@ void ConnectionPage::saveAndTest()
     ImmichConnectionSettings settings;
     settings.serverUrl = url.toString(QUrl::RemoveQuery | QUrl::RemoveFragment);
     settings.apiKey = m_apiKey->text();
-    settings.certFormat = static_cast<TlsCertFormat>(m_certFormat->currentIndex());
-    settings.clientCertPath = m_clientCertPath->text().trimmed();
-    settings.clientKeyPath = m_clientKeyPath->text().trimmed();
-    settings.caCertPath = m_caCertPath->text().trimmed();
-    settings.keyPassword = m_keyPassword->text();
-    settings.rememberKeyPassword = m_rememberKeyPassword->isChecked();
+    if (m_enableClientCert->isChecked()) {
+        settings.certFormat = static_cast<TlsCertFormat>(m_certFormat->currentIndex());
+        settings.clientCertPath = m_clientCertPath->text().trimmed();
+        settings.clientKeyPath = m_clientKeyPath->text().trimmed();
+        settings.caCertPath = m_caCertPath->text().trimmed();
+        settings.keyPassword = m_keyPassword->text();
+        settings.rememberKeyPassword = m_rememberKeyPassword->isChecked();
+    }
 
     const QString localText = m_localServerUrl->text().trimmed();
     if (!localText.isEmpty()) {
@@ -259,6 +258,18 @@ void ConnectionPage::saveAndTest()
     m_saveButton->setEnabled(false);
     m_status->setText(tr("Testing connection…"));
     m_client->testConnection();
+}
+
+void ConnectionPage::updateClientCertVisibility()
+{
+    const bool enabled = m_enableClientCert->isChecked();
+    m_clientCertFields->setVisible(enabled);
+    if (!enabled)
+        return;
+    // PEM keeps a separate key file; PKCS#12 embeds it in the bundle.
+    const bool pem = m_certFormat->currentIndex() == static_cast<int>(TlsCertFormat::Pem);
+    m_clientKeyLabel->setVisible(pem);
+    m_clientKeyRow->setVisible(pem);
 }
 
 void ConnectionPage::showConnectionResult(bool success, const QString &message)
