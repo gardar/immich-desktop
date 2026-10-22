@@ -14,6 +14,7 @@
 #include <QObject>
 #include <QPixmap>
 #include <QSet>
+#include <QSslConfiguration>
 #include <QStringList>
 #include <QThreadPool>
 #include <QUrl>
@@ -79,6 +80,9 @@ public:
     int activeDownloadCount() const;
     QUrl videoStreamUrl(const QString &assetId);
 
+public slots:
+    void provideKeyPassword(const QString &password);
+
 signals:
     void configurationChanged(bool configured);
     void activeEndpointChanged(bool usingLocal, const QString &activeUrl);
@@ -117,6 +121,7 @@ signals:
     void sharedLinkFailed(const QUuid &requestId, const QString &message);
     void requestFailed(const QString &operation, const QString &message);
     void transferActivityChanged();
+    void sslPasswordNeeded();
 
 private:
     static QString normalizeServerUrl(QString url);
@@ -152,11 +157,16 @@ private:
     void finishConnectionTest();
     void requestAssetDetails(const QString &assetId);
     void setupNetworkMonitoring();
+    void rebuildSslConfig();
+    QString effectivePassword() const;
+    QSslConfiguration sslConfigForActiveEndpoint() const;
 
     AppSettings m_store;
     ImmichConnectionSettings m_connection;
     QString m_currentUserId;
     QString m_activeServerUrl;
+    QSslConfiguration m_sslConfig;
+    QString m_sessionKeyPassword;
     QNetworkAccessManager *m_network;
     ThumbnailCache m_thumbnailCache;
     ThumbnailCache m_previewCache{QStringLiteral("previews"), 8 * 1024,
