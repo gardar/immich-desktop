@@ -142,8 +142,8 @@ LibraryPage::LibraryPage(ThemeManager *themeManager, ImmichClient *client,
     toolbar->setObjectName(QStringLiteral("libraryToolbar"));
     auto *toolbarLayout = new QHBoxLayout(toolbar);
     m_searchToolbarLayout = toolbarLayout;
-    toolbarLayout->setContentsMargins(16, 12, 16, 10);
-    toolbarLayout->setSpacing(12);
+    toolbarLayout->setContentsMargins(16, 10, 16, 8);
+    toolbarLayout->setSpacing(8);
 
     auto *headingColumn = new QVBoxLayout;
     headingColumn->setSpacing(2);
@@ -174,19 +174,33 @@ LibraryPage::LibraryPage(ThemeManager *themeManager, ImmichClient *client,
     m_searchSettingsButton->setCursor(Qt::PointingHandCursor);
     m_searchSettingsButton->hide();
     toolbarLayout->addWidget(m_searchSettingsButton);
-    toolbarLayout->addWidget(m_uploadButton);
-    toolbarLayout->addWidget(m_refreshButton);
-    toolbarLayout->addWidget(m_yearsButton);
-    m_zoomSlider = new ZoomSlider(toolbar);
-    m_zoomSlider->setValue(m_tileSize);
-    toolbarLayout->addWidget(m_zoomSlider);
-    connect(m_zoomSlider, &ZoomSlider::valueChanged, this, &LibraryPage::setTileSize);
-    connect(m_zoomSlider, &ZoomSlider::stepRequested, this,
-            [this](int steps) { setTileSize(GridZoom::step(m_tileSize, steps)); });
+
+    // Icon-only actions keep the main page quiet; labels live in tooltips.
+    auto *actions = new QWidget(toolbar);
+    auto *actionsLayout = new QHBoxLayout(actions);
+    actionsLayout->setContentsMargins(0, 0, 0, 0);
+    actionsLayout->setSpacing(4);
     configureActionButton(m_uploadButton, QStringLiteral(":/icons/upload.svg"));
     configureActionButton(m_refreshButton, QStringLiteral(":/icons/refresh-cw.svg"));
     configureActionButton(m_yearsButton, QStringLiteral(":/icons/calendar.svg"));
     configureActionButton(m_searchSettingsButton, QStringLiteral(":/icons/settings.svg"));
+    for (QPushButton *button : {m_uploadButton, m_refreshButton, m_yearsButton}) {
+        const QString tip = button->toolTip();
+        setActionButtonLabel(button, QString());
+        button->setToolTip(tip);
+        button->setAccessibleName(tip);
+    }
+    m_zoomSlider = new ZoomSlider(actions);
+    m_zoomSlider->setValue(m_tileSize);
+    m_zoomSlider->setCompact(true);
+    actionsLayout->addWidget(m_uploadButton);
+    actionsLayout->addWidget(m_refreshButton);
+    actionsLayout->addWidget(m_yearsButton);
+    actionsLayout->addWidget(m_zoomSlider);
+    toolbarLayout->addWidget(actions);
+    connect(m_zoomSlider, &ZoomSlider::valueChanged, this, &LibraryPage::setTileSize);
+    connect(m_zoomSlider, &ZoomSlider::stepRequested, this,
+            [this](int steps) { setTileSize(GridZoom::step(m_tileSize, steps)); });
 
     m_timelineHost->setObjectName(QStringLiteral("timelineHost"));
     m_timelineHost->setAcceptDrops(true);
@@ -778,23 +792,17 @@ void LibraryPage::updateSearchExpansion()
 void LibraryPage::updateToolbarDensity()
 {
     const QWidget *toolbar = m_searchToolbarLayout->parentWidget();
-    // Try the roomiest arrangement first; drop button labels, the slider, then the title.
+    // Actions stay icon-only; hide zoom controls, then the title, when space is tight.
     auto fits = [this, toolbar](int stage) {
-        for (QPushButton *button : {m_uploadButton, m_refreshButton, m_yearsButton}) {
-            if (!button->property("fullLabel").isValid())
-                button->setProperty("fullLabel", button->property("actionLabel"));
-            const QString label =
-                stage >= 1 ? QString() : button->property("fullLabel").toString();
-            if (button->property("actionLabel").toString() != label)
-                setActionButtonLabel(button, label);
-        }
-        m_zoomSlider->setCompact(stage >= 2);
-        m_heading->setVisible(stage < 3);
+        m_zoomSlider->setVisible(stage < 1);
+        m_zoomSlider->setCompact(true);
+        m_heading->setVisible(stage < 2);
+        m_status->setVisible(stage < 2);
         m_searchToolbarLayout->activate();
         return m_searchToolbarLayout->minimumSize().width() <= toolbar->width();
     };
-    if (!fits(0) && !fits(1) && !fits(2))
-        fits(3);
+    if (!fits(0) && !fits(1))
+        fits(2);
 }
 
 void LibraryPage::animateSearchPanel(bool open)
