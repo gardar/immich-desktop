@@ -214,8 +214,12 @@ ImmichClient::ImmichClient(QObject *parent)
     , m_network(new QNetworkAccessManager(this))
     , m_endpointProbeTimer(new QTimer(this))
     , m_reachabilityTimer(new QTimer(this))
+    , m_cacheFlushTimer(new QTimer(this))
 {
     m_imagePool.setMaxThreadCount(4);
+    m_cacheFlushTimer->setSingleShot(true);
+    m_cacheFlushTimer->setInterval(2000);
+    connect(m_cacheFlushTimer, &QTimer::timeout, this, &ImmichClient::flushLibraryCache);
     m_endpointProbeTimer->setInterval(12 * 1000);
     connect(m_endpointProbeTimer, &QTimer::timeout, this, &ImmichClient::probeEndpoints);
     m_reachabilityTimer->setInterval(15 * 1000);
@@ -239,6 +243,7 @@ ImmichClient::ImmichClient(QObject *parent)
 
 ImmichClient::~ImmichClient()
 {
+    flushLibraryCache();
     m_endpointProbeTimer->stop();
     m_reachabilityTimer->stop();
     if (m_network) {
@@ -359,8 +364,23 @@ bool ImmichClient::isTransientNetworkError(QNetworkReply *reply)
     }
 }
 
+void ImmichClient::queueLibraryCache(const QList<ImmichAsset> &assets)
+{
+    m_pendingCacheAssets.append(assets);
+    m_cacheFlushTimer->start();
+}
+
+void ImmichClient::flushLibraryCache()
+{
+    m_cacheFlushTimer->stop();
+    if (m_pendingCacheAssets.isEmpty())
+        return;
+    m_offlineStore.mergeLibrary(m_connection.serverUrl, std::exchange(m_pendingCacheAssets, {}));
+}
+
 void ImmichClient::setConnection(const ImmichConnectionSettings &connection, bool persist)
 {
+    flushLibraryCache();
     ImmichConnectionSettings normalized = connection;
     normalized.serverUrl = normalizeServerUrl(normalized.serverUrl);
     normalized.localServerUrl = normalizeServerUrl(normalized.localServerUrl);
@@ -756,7 +776,7 @@ void ImmichClient::loadTimelineBucket(const QDate &month)
             return;
         }
         const QList<ImmichAsset> assets = assetsFromBucketBody(body);
-        m_offlineStore.mergeLibrary(m_connection.serverUrl, assets);
+        queueLibraryCache(assets);
         emit timelineBucketLoaded(month, assets);
         reply->deleteLater();
     });
@@ -803,6 +823,10 @@ void ImmichClient::searchAssets(int page, int pageSize, bool pollOnly, const QSt
     }
 
     QJsonObject body = pollOnly ? QJsonObject{} : filters;
+    // The timeline never shows hidden assets (e.g. the video half of a Live Photo),
+    // so they must not count as new photos.
+    if (pollOnly)
+        body.insert(QStringLiteral("visibility"), QStringLiteral("timeline"));
     body.insert(QStringLiteral("page"), qMax(1, page));
     body.insert(QStringLiteral("size"), qBound(1, pageSize, 250));
     body.insert(QStringLiteral("withExif"), true);
@@ -855,10 +879,14 @@ void ImmichClient::searchAssets(int page, int pageSize, bool pollOnly, const QSt
             emit newestAssetsPolled(assets);
         } else {
             if (!filteredSearch) {
-                if (page <= 1)
+                if (page <= 1) {
+                    // A fresh first page replaces the cache; older queued months are stale.
+                    m_pendingCacheAssets.clear();
+                    m_cacheFlushTimer->stop();
                     m_offlineStore.saveLibrary(m_connection.serverUrl, assets, trimmedQuery);
-                else
-                    m_offlineStore.mergeLibrary(m_connection.serverUrl, assets);
+                } else {
+                    queueLibraryCache(assets);
+                }
             }
             emit assetsLoaded(assets, nextPage, trimmedQuery, false);
         }

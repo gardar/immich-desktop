@@ -784,6 +784,8 @@ void LibraryPage::finishTimelineBucket(const QDate &month, const QList<ImmichAss
 
     if (m_flushedBucketCount >= m_monthBuckets.size() && m_inflightBuckets.isEmpty()) {
         m_loading = false;
+        // Otherwise the new-photo check stays paused after its first refresh.
+        m_autoRefreshPending = false;
         m_refreshButton->setEnabled(true);
         m_status->setText(tr("%n item(s)", nullptr, m_assets.size()));
         updateEndpointHint();
@@ -1648,6 +1650,7 @@ void LibraryPage::showThumbnail(const QString &assetId, const QPixmap &thumbnail
     }
 
     m_requestedThumbnails.remove(assetId);
+    m_thumbnailRetries.remove(assetId);
     const QPointer<MediaTile> tile = m_tilesById.value(assetId);
     if (!tile || m_tilesById.value(assetId) != tile.data())
         return;
@@ -1676,8 +1679,23 @@ void LibraryPage::showThumbnailError(const QString &assetId, const QString &resu
         return;
     m_requestedThumbnails.remove(assetId);
     const QPointer<MediaTile> tile = m_tilesById.value(assetId);
-    if (tile && m_tilesById.value(assetId) == tile.data() && isTileNearViewport(tile))
-        tile->setThumbnailError(message);
+    if (!tile || m_tilesById.value(assetId) != tile.data() || !isTileNearViewport(tile))
+        return;
+    tile->setThumbnailError(message);
+
+    // Immich generates thumbnails after an upload finishes, so a just-uploaded
+    // photo briefly has none (404). Retry a few times before giving up.
+    static constexpr int kRetryDelaysMs[] = {5000, 20000, 60000};
+    const int attempt = m_thumbnailRetries.value(assetId);
+    if (attempt >= int(std::size(kRetryDelaysMs)))
+        return;
+    m_thumbnailRetries.insert(assetId, attempt + 1);
+    QTimer::singleShot(kRetryDelaysMs[attempt], this, [this, assetId] {
+        if (MediaTile *retryTile = m_tilesById.value(assetId)) {
+            retryTile->clearThumbnailError();
+            scheduleVisibleMediaUpdate();
+        }
+    });
 }
 
 void LibraryPage::showRequestError(const QString &operation, const QString &message)
@@ -1771,7 +1789,6 @@ void LibraryPage::layoutTimeline()
                 const int row = index / columns;
                 tile->setGeometry(kSidePad + col * (cellSize + kGridGap),
                                   startY + row * (cellSize + kGridGap), cellSize, cellSize);
-                tile->show();
                 ++index;
             }
         }
@@ -1825,7 +1842,6 @@ void LibraryPage::layoutTimeline()
                     width = availableWidth - used;
                 width = qMax(40, width);
                 tile->setGeometry(x, y, width, qRound(height));
-                tile->show();
                 x += width + kGap;
                 used += width + (i == row.size() - 1 ? 0 : kGap);
             }
@@ -1889,6 +1905,13 @@ void LibraryPage::updateVisibleMedia()
     const QRect keepRect(0, qMax(0, scrollTop - viewportHeight), m_timelineHost->width(),
                          viewportHeight * 3);
 
+    // Showing a tile for the first time is costly (style polish), so only tiles
+    // near the viewport are shown; a 700-photo month would otherwise stall the UI.
+    for (MediaTile *tile : std::as_const(m_tilesById)) {
+        if (tile)
+            tile->setVisible(keepRect.intersects(tile->geometry()));
+    }
+
     constexpr int kMaxThumbnailRequestsPerTick = 16;
     int requested = 0;
     for (auto it = m_tilesById.cbegin(); it != m_tilesById.cend(); ++it) {
@@ -1898,6 +1921,8 @@ void LibraryPage::updateVisibleMedia()
             continue;
 
         if (!keepRect.intersects(tile->geometry())) {
+            // Coming back to a failed tile later should try again.
+            tile->clearThumbnailError();
             if (tile->hasThumbnail()) {
                 tile->clearThumbnail();
                 m_requestedThumbnails.remove(assetId);

@@ -157,6 +157,8 @@ private:
     void finishConnectionTest();
     void requestAssetDetails(const QString &assetId);
     void setupNetworkMonitoring();
+    void queueLibraryCache(const QList<ImmichAsset> &assets);
+    void flushLibraryCache();
     void rebuildSslConfig();
     QString effectivePassword() const;
     QSslConfiguration sslConfigForActiveEndpoint() const;
@@ -176,6 +178,10 @@ private:
     QThreadPool m_imagePool;
     QTimer *m_endpointProbeTimer;
     QTimer *m_reachabilityTimer;
+    // Offline-cache merges are batched: rewriting the whole cache for each of
+    // hundreds of timeline months made Library loading quadratic.
+    QTimer *m_cacheFlushTimer;
+    QList<ImmichAsset> m_pendingCacheAssets;
     QSet<QString> m_pendingImages;
     QSet<QString> m_pendingPersonImages;
     QStringList m_uploadQueue;

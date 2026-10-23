@@ -233,6 +233,7 @@ private:
     QHash<QString, MediaTile *> m_tilesById;
     QSet<QString> m_localAssetIds;
     QSet<QString> m_requestedThumbnails;
+    QHash<QString, int> m_thumbnailRetries;
     QHash<QString, int> m_requestedTileImages;
     QList<ImmichAsset> m_assets;
     QList<TimeBucketInfo> m_monthBuckets;

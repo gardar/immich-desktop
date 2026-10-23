@@ -29,6 +29,7 @@ public:
     bool hasThumbnailError() const;
     void setThumbnail(const QPixmap &thumbnail);
     void setThumbnailError(const QString &message);
+    void clearThumbnailError();
     void clearThumbnail();
     void setTileSize(const QSize &size);
     void setHoverPreview(VideoHoverPreview *preview);

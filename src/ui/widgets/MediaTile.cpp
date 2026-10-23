@@ -80,6 +80,15 @@ void MediaTile::setThumbnail(const QPixmap &thumbnail)
     update();
 }
 
+void MediaTile::clearThumbnailError()
+{
+    if (!m_hasError)
+        return;
+    m_hasError = false;
+    m_error.clear();
+    update();
+}
+
 void MediaTile::setThumbnailError(const QString &message)
 {
     m_thumbnail = QPixmap();
