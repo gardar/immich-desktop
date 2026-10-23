@@ -823,6 +823,10 @@ void ImmichClient::searchAssets(int page, int pageSize, bool pollOnly, const QSt
     }
 
     QJsonObject body = pollOnly ? QJsonObject{} : filters;
+    // The timeline never shows hidden assets (e.g. the video half of a Live Photo),
+    // so they must not count as new photos.
+    if (pollOnly)
+        body.insert(QStringLiteral("visibility"), QStringLiteral("timeline"));
     body.insert(QStringLiteral("page"), qMax(1, page));
     body.insert(QStringLiteral("size"), qBound(1, pageSize, 250));
     body.insert(QStringLiteral("withExif"), true);
