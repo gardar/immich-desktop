@@ -1650,6 +1650,7 @@ void LibraryPage::showThumbnail(const QString &assetId, const QPixmap &thumbnail
     }
 
     m_requestedThumbnails.remove(assetId);
+    m_thumbnailRetries.remove(assetId);
     const QPointer<MediaTile> tile = m_tilesById.value(assetId);
     if (!tile || m_tilesById.value(assetId) != tile.data())
         return;
@@ -1678,8 +1679,23 @@ void LibraryPage::showThumbnailError(const QString &assetId, const QString &resu
         return;
     m_requestedThumbnails.remove(assetId);
     const QPointer<MediaTile> tile = m_tilesById.value(assetId);
-    if (tile && m_tilesById.value(assetId) == tile.data() && isTileNearViewport(tile))
-        tile->setThumbnailError(message);
+    if (!tile || m_tilesById.value(assetId) != tile.data() || !isTileNearViewport(tile))
+        return;
+    tile->setThumbnailError(message);
+
+    // Immich generates thumbnails after an upload finishes, so a just-uploaded
+    // photo briefly has none (404). Retry a few times before giving up.
+    static constexpr int kRetryDelaysMs[] = {5000, 20000, 60000};
+    const int attempt = m_thumbnailRetries.value(assetId);
+    if (attempt >= int(std::size(kRetryDelaysMs)))
+        return;
+    m_thumbnailRetries.insert(assetId, attempt + 1);
+    QTimer::singleShot(kRetryDelaysMs[attempt], this, [this, assetId] {
+        if (MediaTile *retryTile = m_tilesById.value(assetId)) {
+            retryTile->clearThumbnailError();
+            scheduleVisibleMediaUpdate();
+        }
+    });
 }
 
 void LibraryPage::showRequestError(const QString &operation, const QString &message)
@@ -1905,6 +1921,8 @@ void LibraryPage::updateVisibleMedia()
             continue;
 
         if (!keepRect.intersects(tile->geometry())) {
+            // Coming back to a failed tile later should try again.
+            tile->clearThumbnailError();
             if (tile->hasThumbnail()) {
                 tile->clearThumbnail();
                 m_requestedThumbnails.remove(assetId);
