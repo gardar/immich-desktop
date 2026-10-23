@@ -43,8 +43,7 @@ UpdatesPage::UpdatesPage(UpdateManager *updateManager, QWidget *parent)
     root->addWidget(heading);
 
     m_versionLabel->setProperty("subheading", true);
-    m_versionLabel->setText(
-        tr("Current version: v%1").arg(QString::fromLatin1(Config::ApplicationVersion)));
+    m_versionLabel->setText(tr("Current version: %1").arg(Config::displayVersion()));
     if (m_updateManager->usesSnapStore()) {
         const QString snapVersion = qEnvironmentVariable("SNAP_VERSION");
         if (!snapVersion.isEmpty()) {
@@ -191,6 +190,14 @@ void UpdatesPage::refreshStarCard()
 
 void UpdatesPage::refreshUi()
 {
+    if (!UpdateManager::isEnabled()) {
+        m_statusLabel->setText(
+            tr("Updates for this installation are provided by your package manager."));
+        for (QWidget *control : std::initializer_list<QWidget *>{
+                 m_refreshButton, m_updateButton, m_autoCheck, m_progress, m_notesScroll})
+            control->hide();
+        return;
+    }
     const auto state = m_updateManager->state();
     const auto info = m_updateManager->availableUpdate();
     const QSignalBlocker blocker(m_autoCheck);

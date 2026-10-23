@@ -226,7 +226,7 @@ AboutPage::AboutPage(QWidget *parent)
         const QString snapVer = qEnvironmentVariable("SNAP_VERSION");
         const QString shown = !snapVer.isEmpty()
                                   ? tr("v%1 (Snap %2)").arg(ver, snapVer)
-                                  : tr("v%1").arg(ver);
+                                  : Config::displayVersion();
         l->addWidget(bodyLabel(shown, c));
         l->addWidget(bodyLabel(
             tr("Licensed under MIT. See LICENSE.txt. Immich is a trademark of its owners; "

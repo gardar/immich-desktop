@@ -62,6 +62,9 @@ public:
     void applyUpdate();
     bool shouldAutoCheck() const;
     bool usesSnapStore() const;
+    // False in builds made with -DIMMICH_ENABLE_UPDATER=OFF, where the package
+    // manager delivers updates instead.
+    static bool isEnabled();
 
 signals:
     void stateChanged(Aurora::UpdateState state);

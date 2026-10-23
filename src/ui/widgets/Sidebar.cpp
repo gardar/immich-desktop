@@ -45,8 +45,7 @@ Sidebar::Sidebar(ThemeManager *themeManager, QWidget *parent)
     connect(m_toggleButton, &QPushButton::clicked, this, &Sidebar::toggleCollapsed);
     layout->addWidget(m_toggleButton);
 
-    m_version->setText(tr("fan-made\nimmich desktop  ·  v%1")
-                           .arg(QString::fromLatin1(Config::ApplicationVersion)));
+    m_version->setText(tr("fan-made\nimmich desktop  ·  %1").arg(Config::displayVersion()));
     m_version->setProperty("subheading", true);
     m_version->setAlignment(Qt::AlignCenter);
     m_version->setWordWrap(true);
