@@ -17,6 +17,7 @@
   <a href="https://github.com/hdmain/immich-desktop/issues"><img src="https://img.shields.io/github/issues/hdmain/immich-desktop?style=flat-square" alt="Issues"></a>
   <a href="https://github.com/hdmain/immich-desktop/releases"><img src="https://img.shields.io/github/downloads/hdmain/immich-desktop/total?style=flat-square" alt="Downloads"></a>
   <a href="https://snapcraft.io/immich-desktop"><img src="https://img.shields.io/badge/snap-immich--desktop-E95420?style=flat-square&logo=snapcraft&logoColor=white" alt="Snap"></a>
+  <a href="https://aur.archlinux.org/packages/immich-desktop"><img src="https://img.shields.io/aur/version/immich-desktop?style=flat-square&logo=archlinux&logoColor=white" alt="AUR"></a>
   <a href="LICENSE.txt"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License"></a>
 </p>
 
@@ -57,6 +58,15 @@ sudo snap install immich-desktop
   </a>
 </p>
 
+### Arch Linux (AUR)
+
+A community-maintained [`immich-desktop`](https://aur.archlinux.org/packages/immich-desktop)
+package builds from source with your system's Qt:
+
+```bash
+yay -S immich-desktop   # or any other AUR helper
+```
+
 ### Other packages
 
 Grab Windows (`.exe` / `.msi`), Linux `.deb`, or AppImage (`x86_64` / `aarch64`)
@@ -65,14 +75,14 @@ Snap Store ships `amd64` and `arm64`.
 
 ## How to run
 
-1. Install Immich Desktop from Snap or a [GitHub release](https://github.com/hdmain/immich-desktop/releases/latest).
+1. Install Immich Desktop from Snap, the Arch Linux AUR, or a [GitHub release](https://github.com/hdmain/immich-desktop/releases/latest).
 2. Open the app and go to **Settings → Immich Server**.
 3. Enter your Immich server URL and an API key with permissions such as `user.read`, `asset.read`, `asset.view`, `asset.upload`, `asset.download`, `asset.delete`, and `person.read` (add `album.read` to list a photo's albums in the info panel). Optionally set a **Local URL** for LAN use.
 4. Test the connection, save, then browse **Library** or **Explore**.
 5. (Optional) Open **Settings → Folder Sync**, choose folders with the system file picker (use **+** to add more), enable watching, and turn on **Upload only when Immich is available on the local network** if you only want uploads over LAN. Drop photos or videos into those folders; they appear in Library with sync status badges and upload when allowed. Each folder has its own Browse, Open folder, and Remove controls.
 
 ```bash
-# Snap
+# Snap or Arch Linux AUR
 immich-desktop
 
 # AppImage (x86_64 or aarch64)
