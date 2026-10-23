@@ -19,6 +19,11 @@ find_package(Qt6 6.2 REQUIRED COMPONENTS
 
 set(IMMICH_GITHUB_REPO "hdmain/immich-desktop" CACHE STRING
     "GitHub repository used for in-app update checks")
+# Distribution packages usually manage updates and naming themselves.
+option(IMMICH_ENABLE_UPDATER "Check GitHub for new releases and offer to install them" ON)
+set(IMMICH_EXECUTABLE_NAME "immich" CACHE STRING "File name of the installed executable")
+set(IMMICH_BUILD_INFO "" CACHE STRING
+    "Shown after the version, e.g. the package source or commit (\"AUR\", \"beta 1a2b3c4\")")
 
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated")
 configure_file(
@@ -176,6 +181,11 @@ if(WIN32)
     )
 endif()
 
+set_target_properties(immich PROPERTIES OUTPUT_NAME "${IMMICH_EXECUTABLE_NAME}")
+if(NOT IMMICH_ENABLE_UPDATER)
+    target_compile_definitions(immich PRIVATE IMMICH_UPDATER_DISABLED)
+endif()
+
 include(GNUInstallDirs)
 install(TARGETS immich
     BUNDLE DESTINATION .
@@ -215,7 +225,10 @@ if(WIN32)
 endif()
 
 if(UNIX AND NOT APPLE)
-    install(FILES resources/immich-desktop.desktop
+    configure_file(resources/immich-desktop.desktop.in
+        "${CMAKE_CURRENT_BINARY_DIR}/immich-desktop.desktop" @ONLY
+    )
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/immich-desktop.desktop"
         DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
     )
     install(FILES resources/immich-desktop.metainfo.xml

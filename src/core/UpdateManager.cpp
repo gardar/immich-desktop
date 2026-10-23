@@ -65,7 +65,22 @@ UpdateState UpdateManager::state() const { return m_state; }
 UpdateInfo UpdateManager::availableUpdate() const { return m_update; }
 QString UpdateManager::errorMessage() const { return m_error; }
 QString UpdateManager::downloadedPackagePath() const { return m_downloadPath; }
-UpdateSettings UpdateManager::settings() const { return m_settingsStore.loadUpdate(); }
+UpdateSettings UpdateManager::settings() const
+{
+    UpdateSettings update = m_settingsStore.loadUpdate();
+    if (!isEnabled())
+        update.autoCheck = false;
+    return update;
+}
+
+bool UpdateManager::isEnabled()
+{
+#ifdef IMMICH_UPDATER_DISABLED
+    return false;
+#else
+    return true;
+#endif
+}
 
 void UpdateManager::setAutoCheckEnabled(bool enabled)
 {
@@ -101,6 +116,8 @@ bool UpdateManager::usesSnapStore() const
 
 void UpdateManager::checkForUpdates(bool silent)
 {
+    if (!isEnabled())
+        return;
     if (m_state == UpdateState::Checking || m_state == UpdateState::Downloading ||
         m_state == UpdateState::Installing) {
         return;
@@ -205,6 +222,8 @@ void UpdateManager::downloadUpdate()
 
 void UpdateManager::applyUpdate()
 {
+    if (!isEnabled())
+        return;
     if (m_state == UpdateState::ReadyToInstall) {
         installUpdate();
         return;

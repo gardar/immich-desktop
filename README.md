@@ -135,6 +135,25 @@ Major community contributor: [gardar](https://github.com/gardar) (viewer navigat
 
 Ways to help right now: bug fixes, UX polish, Immich API coverage (albums, sharing, memories), packaging (Flatpak/Snap), and testing on different distros/GPUs. No pressure on scope, small PRs and ideas are welcome too. See `Settings → About` in the app for the full tech stack and links.
 
+## Building from source
+
+Requires CMake 3.21+ and Qt 6.2+ (Core, Gui, Widgets, Network, Svg, Multimedia). Install
+`qt6-imageformats` (or your distro's equivalent) at runtime so WebP thumbnails can be decoded.
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+./build/immich
+```
+
+Options for distribution packages:
+
+| Option | Default | Purpose |
+| --- | --- | --- |
+| `IMMICH_ENABLE_UPDATER` | `ON` | Built-in update checks and installs; turn off when a package manager handles updates |
+| `IMMICH_EXECUTABLE_NAME` | `immich` | Name of the installed executable (the `.desktop` file follows it) |
+| `IMMICH_BUILD_INFO` | empty | Shown after the version, e.g. `AUR` or `beta 1a2b3c4` → "v0.2.3 (AUR)" |
+
 ## Project layout
 
 - `src/core` - settings, Immich client, updates, tray helpers
