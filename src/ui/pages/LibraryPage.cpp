@@ -784,6 +784,8 @@ void LibraryPage::finishTimelineBucket(const QDate &month, const QList<ImmichAss
 
     if (m_flushedBucketCount >= m_monthBuckets.size() && m_inflightBuckets.isEmpty()) {
         m_loading = false;
+        // Otherwise the new-photo check stays paused after its first refresh.
+        m_autoRefreshPending = false;
         m_refreshButton->setEnabled(true);
         m_status->setText(tr("%n item(s)", nullptr, m_assets.size()));
         updateEndpointHint();
