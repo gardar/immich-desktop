@@ -158,7 +158,12 @@ private:
     void prependLocalAsset(const ImmichAsset &asset);
     void removeLocalAsset(const QString &assetId);
     void loadLocalThumbnail(MediaTile *tile, const ImmichAsset &asset);
-    void loadNextTimelineBucket();
+    void kickTimelineBucketFetches();
+    void finishTimelineBucket(const QDate &month, const QList<ImmichAsset> &assets);
+    void flushReadyTimelineBuckets();
+    void updateTimelineLoadingStatus();
+    int remainingIndexedAssetCount() const;
+    int estimateReservedTimelineHeight(int remainingAssets) const;
     bool hasMoreToLoad() const;
     void jumpToDate(const QDate &day);
     void scrollToPendingDate();
@@ -231,10 +236,13 @@ private:
     QHash<QString, int> m_requestedTileImages;
     QList<ImmichAsset> m_assets;
     QList<TimeBucketInfo> m_monthBuckets;
-    // Collect metadata for the whole timeline before exposing its scroll range.
-    // Thumbnail requests remain limited to the visible viewport.
-    QList<ImmichAsset> m_timelineIndexAssets;
-    int m_nextBucketIndex = 0;
+    // Progressive index: fetch several months in parallel, append in newest-first
+    // order as a contiguous prefix becomes ready, and reserve scroll space for the rest.
+    QHash<QDate, QList<ImmichAsset>> m_readyBucketAssets;
+    QHash<QDate, int> m_inflightBuckets; // month -> timeline epoch when requested
+    int m_timelineEpoch = 0;
+    int m_nextBucketToRequest = 0;
+    int m_flushedBucketCount = 0;
     QDate m_pendingScrollToDate;
     QDate m_pendingDay;
 

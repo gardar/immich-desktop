@@ -78,6 +78,7 @@ constexpr int kGap = 3;
 constexpr int kSidePad = 12;
 constexpr int kAutoCheckIntervalMs = 30 * 1000;
 constexpr int kSearchDebounceMs = 350;
+constexpr int kParallelTimelineBuckets = 4;
 
 QString mediaFileFilter()
 {
@@ -644,8 +645,11 @@ void LibraryPage::refresh()
     }
 
     m_monthBuckets.clear();
-    m_timelineIndexAssets.clear();
-    m_nextBucketIndex = 0;
+    m_readyBucketAssets.clear();
+    m_inflightBuckets.clear();
+    ++m_timelineEpoch;
+    m_nextBucketToRequest = 0;
+    m_flushedBucketCount = 0;
     m_pendingScrollToDate = QDate();
 
     if (!m_client->isOnline()) {
@@ -659,7 +663,7 @@ void LibraryPage::refresh()
     m_loading = true;
     updateEmptyState();
     m_refreshButton->setEnabled(false);
-    m_status->setText(tr("Loading library index…"));
+    m_status->setText(tr("Loading library…"));
     // Keep the previous offline snapshot until a successful reload replaces it.
     m_client->loadTimelineBuckets();
 }
@@ -696,13 +700,96 @@ void LibraryPage::maybeLoadMore()
         loadMore();
 }
 
-void LibraryPage::loadNextTimelineBucket()
+void LibraryPage::kickTimelineBucketFetches()
 {
-    if (m_nextBucketIndex >= m_monthBuckets.size())
+    if (m_searchActive || m_contentStack->currentIndex() != 0)
         return;
-    m_loading = true;
-    m_refreshButton->setEnabled(false);
-    m_client->loadTimelineBucket(m_monthBuckets.at(m_nextBucketIndex).month);
+    while (m_inflightBuckets.size() < kParallelTimelineBuckets
+           && m_nextBucketToRequest < m_monthBuckets.size()) {
+        const QDate month = m_monthBuckets.at(m_nextBucketToRequest).month;
+        ++m_nextBucketToRequest;
+        m_inflightBuckets.insert(month, m_timelineEpoch);
+        m_client->loadTimelineBucket(month);
+    }
+}
+
+int LibraryPage::remainingIndexedAssetCount() const
+{
+    int remaining = 0;
+    for (int i = m_flushedBucketCount; i < m_monthBuckets.size(); ++i)
+        remaining += m_monthBuckets.at(i).count;
+    return remaining;
+}
+
+int LibraryPage::estimateReservedTimelineHeight(int remainingAssets) const
+{
+    if (remainingAssets <= 0)
+        return 0;
+    const int viewportWidth = m_scrollArea->viewport()->width();
+    const int availableWidth = qMax(240, viewportWidth - 2 * kSidePad);
+    if (m_compactGrid) {
+        constexpr int kGridGap = 3;
+        const int columns = qMax(1, (availableWidth + kGridGap) / (m_tileSize + kGridGap));
+        const int cellSize = (availableWidth - (columns - 1) * kGridGap) / columns;
+        const int rows = (remainingAssets + columns - 1) / columns;
+        return rows * (cellSize + kGridGap);
+    }
+    const int columns = qMax(1, (availableWidth + kGap) / (m_tileSize + kGap));
+    const int rows = (remainingAssets + columns - 1) / columns;
+    // Include a little room for day headers that appear once months flush in.
+    return rows * (m_tileSize + kGap) + rows * 4;
+}
+
+void LibraryPage::updateTimelineLoadingStatus()
+{
+    if (m_searchActive || !m_loading)
+        return;
+    if (m_flushedBucketCount >= m_monthBuckets.size()) {
+        m_status->setText(tr("%n item(s)", nullptr, m_assets.size()));
+        return;
+    }
+    m_status->setText(tr("Loading library… %1/%2 months")
+                          .arg(m_flushedBucketCount)
+                          .arg(m_monthBuckets.size()));
+}
+
+void LibraryPage::flushReadyTimelineBuckets()
+{
+    bool appended = false;
+    while (m_flushedBucketCount < m_monthBuckets.size()) {
+        const QDate month = m_monthBuckets.at(m_flushedBucketCount).month;
+        if (!m_readyBucketAssets.contains(month))
+            break;
+        appendAssetsToTimeline(m_readyBucketAssets.take(month));
+        ++m_flushedBucketCount;
+        appended = true;
+    }
+    if (!appended)
+        return;
+    updateEmptyState();
+    layoutTimeline();
+    scheduleLayout();
+    if (m_pendingScrollToDate.isValid())
+        QTimer::singleShot(60, this, &LibraryPage::scrollToPendingDate);
+}
+
+void LibraryPage::finishTimelineBucket(const QDate &month, const QList<ImmichAsset> &assets)
+{
+    if (m_inflightBuckets.value(month, -1) != m_timelineEpoch)
+        return;
+    m_inflightBuckets.remove(month);
+    m_readyBucketAssets.insert(month, assets);
+    flushReadyTimelineBuckets();
+    updateTimelineLoadingStatus();
+
+    if (m_flushedBucketCount >= m_monthBuckets.size() && m_inflightBuckets.isEmpty()) {
+        m_loading = false;
+        m_refreshButton->setEnabled(true);
+        m_status->setText(tr("%n item(s)", nullptr, m_assets.size()));
+        updateEndpointHint();
+        updateEmptyState();
+        updateAutoCheckTimer();
+    }
 }
 
 void LibraryPage::checkForNewPhotos()
@@ -1131,8 +1218,10 @@ void LibraryPage::handleTimelineBucketsLoaded(const QList<TimeBucketInfo> &bucke
         return;
 
     m_monthBuckets = buckets;
-    m_timelineIndexAssets.clear();
-    m_nextBucketIndex = 0;
+    m_readyBucketAssets.clear();
+    m_inflightBuckets.clear();
+    m_nextBucketToRequest = 0;
+    m_flushedBucketCount = 0;
 
     if (m_pendingDay.isValid())
         m_pendingScrollToDate = std::exchange(m_pendingDay, QDate());
@@ -1157,7 +1246,13 @@ void LibraryPage::handleTimelineBucketsLoaded(const QList<TimeBucketInfo> &bucke
         return;
     }
 
-    loadNextTimelineBucket();
+    m_loading = true;
+    m_refreshButton->setEnabled(false);
+    updateTimelineLoadingStatus();
+    updateEmptyState();
+    // Reserve scroll space from bucket counts before any month arrives.
+    layoutTimeline();
+    kickTimelineBucketFetches();
 }
 
 void LibraryPage::handleTimelineBucketLoaded(const QDate &month,
@@ -1174,38 +1269,11 @@ void LibraryPage::handleTimelineBucketLoaded(const QDate &month,
 
     if (m_searchActive)
         return;
-    // Ignore a stale reply that no longer matches where the cursor is (e.g.
-    // a refresh reset things while this request was in flight).
-    if (!m_loading || m_nextBucketIndex >= m_monthBuckets.size() ||
-        m_monthBuckets.at(m_nextBucketIndex).month != month)
+    if (m_inflightBuckets.value(month, -1) != m_timelineEpoch)
         return;
 
-    m_timelineIndexAssets.append(assets);
-    ++m_nextBucketIndex;
-    if (m_nextBucketIndex < m_monthBuckets.size()) {
-        m_status->setText(tr("Loading library index… %1/%2 months")
-                              .arg(m_nextBucketIndex).arg(m_monthBuckets.size()));
-        loadNextTimelineBucket();
-        return;
-    }
-
-    // A complete metadata index gives both grid modes their final geometry,
-    // including dates and aspect ratios, before the user starts scrolling.
-    // Loading thumbnails later must never extend the scroll range.
-    appendAssetsToTimeline(std::exchange(m_timelineIndexAssets, {}));
-    syncPendingLocalAssets();
-    m_loading = false;
-    m_refreshButton->setEnabled(true);
-    m_status->setText(tr("%n item(s)", nullptr, m_assets.size()));
-    updateEndpointHint();
-    updateEmptyState();
-    layoutTimeline();
-    scheduleLayout();
-    updateAutoCheckTimer();
-
-    if (m_pendingScrollToDate.isValid())
-        QTimer::singleShot(60, this, &LibraryPage::scrollToPendingDate);
-    QTimer::singleShot(0, this, &LibraryPage::maybeLoadMore);
+    finishTimelineBucket(month, assets);
+    kickTimelineBucketFetches();
 }
 
 void LibraryPage::handleTimelineBucketFailed(const QDate &month, const QString &message)
@@ -1216,18 +1284,23 @@ void LibraryPage::handleTimelineBucketFailed(const QDate &month, const QString &
         handleYearDetailBucketLoaded(year, month, {});
     }
 
-    if (m_searchActive || !m_loading || m_nextBucketIndex >= m_monthBuckets.size() ||
-        m_monthBuckets.at(m_nextBucketIndex).month != month)
+    if (m_searchActive)
+        return;
+    if (m_inflightBuckets.value(month, -1) != m_timelineEpoch)
         return;
 
-    m_timelineIndexAssets.clear();
-    m_pendingScrollToDate = QDate();
-    m_loading = false;
-    m_refreshButton->setEnabled(true);
-    m_status->setText(tr("Couldn't load library index: %1. Refresh to retry.").arg(message));
-    updateEmptyState();
-    if (m_assets.isEmpty())
+    // Skip the failed month so later months can still stream in.
+    finishTimelineBucket(month, {});
+    kickTimelineBucketFetches();
+    if (m_assets.isEmpty() && m_flushedBucketCount >= m_monthBuckets.size()) {
+        m_status->setText(tr("Couldn't load library: %1. Refresh to retry.").arg(message));
+        updateEmptyState();
         m_emptyState->setText(m_status->text());
+    } else if (m_loading) {
+        m_status->setText(tr("Loading library… %1/%2 months (some months failed)")
+                              .arg(m_flushedBucketCount)
+                              .arg(m_monthBuckets.size()));
+    }
 }
 
 QList<LibraryPage::YearSummary> LibraryPage::computeYearSummaries() const
@@ -1276,9 +1349,11 @@ void LibraryPage::showYearGrid()
 void LibraryPage::backToLibrary()
 {
     m_contentStack->setCurrentIndex(0);
-    if (!m_searchActive && !m_loading && m_nextBucketIndex < m_monthBuckets.size()) {
-        refresh();
-        return;
+    if (!m_searchActive && m_flushedBucketCount < m_monthBuckets.size()) {
+        m_loading = true;
+        m_refreshButton->setEnabled(false);
+        updateTimelineLoadingStatus();
+        kickTimelineBucketFetches();
     }
     updateEmptyState();
     scheduleVisibleMediaUpdate();
@@ -1525,21 +1600,20 @@ void LibraryPage::jumpToDate(const QDate &day)
     if (index < 0)
         return;
 
-    if (m_nextBucketIndex == m_monthBuckets.size()) {
-        // Already loaded as part of the normal scroll - just scroll to it,
-        // keeping everything else that's already on screen intact.
+    if (index < m_flushedBucketCount) {
         m_pendingScrollToDate = day;
         scrollToPendingDate();
         return;
     }
 
-    // The index is loaded independently of scroll position. Remember this
-    // date and jump only after the full timeline has its final geometry.
+    // Keep loading in the background; scroll once this month joins the timeline.
     m_pendingScrollToDate = day;
     if (!m_loading) {
-        m_pendingDay = day;
-        refresh();
+        m_loading = true;
+        m_refreshButton->setEnabled(false);
     }
+    updateTimelineLoadingStatus();
+    kickTimelineBucketFetches();
 }
 
 void LibraryPage::scrollToPendingDate()
@@ -1669,7 +1743,10 @@ void LibraryPage::clearTimeline()
     m_localAssetIds.clear();
     m_requestedThumbnails.clear();
     m_assets.clear();
-    m_timelineIndexAssets.clear();
+    m_readyBucketAssets.clear();
+    m_inflightBuckets.clear();
+    m_nextBucketToRequest = 0;
+    m_flushedBucketCount = 0;
     m_nextPage.clear();
     m_newestAssetId.clear();
 }
@@ -1700,8 +1777,9 @@ void LibraryPage::layoutTimeline()
         }
 
         const int totalRows = (index + columns - 1) / columns;
+        const int reserved = estimateReservedTimelineHeight(remainingIndexedAssetCount());
         m_timelineHost->resize(viewportWidth,
-                               startY + totalRows * (cellSize + kGridGap) + 16);
+                               startY + totalRows * (cellSize + kGridGap) + reserved + 16);
         scheduleVisibleMediaUpdate();
         QTimer::singleShot(0, this, &LibraryPage::maybeLoadMore);
         return;
@@ -1770,7 +1848,8 @@ void LibraryPage::layoutTimeline()
         y += 10;
     }
 
-    m_timelineHost->resize(viewportWidth, y + 16);
+    const int reserved = estimateReservedTimelineHeight(remainingIndexedAssetCount());
+    m_timelineHost->resize(viewportWidth, y + reserved + 16);
     scheduleVisibleMediaUpdate();
     QTimer::singleShot(0, this, &LibraryPage::maybeLoadMore);
 }
@@ -1859,7 +1938,11 @@ void LibraryPage::updateVisibleMedia()
 
 void LibraryPage::updateEmptyState()
 {
-    const bool empty = m_assets.isEmpty();
+    // While months are still streaming in, keep the scroll view visible so the
+    // reserved height from /timeline/buckets is usable immediately.
+    const bool streamingPlaceholder =
+        m_assets.isEmpty() && m_loading && !m_searchActive && !m_monthBuckets.isEmpty();
+    const bool empty = m_assets.isEmpty() && !streamingPlaceholder;
     // Only touch visibility of the Library page's own widgets when it's
     // actually the active stack page - otherwise this fights with
     // QStackedWidget's page management (e.g. a background new-photos poll
@@ -1878,7 +1961,7 @@ void LibraryPage::updateEmptyState()
         return;
     }
     if (m_loading && !m_searchActive) {
-        m_emptyState->setText(tr("Loading library index…"));
+        m_emptyState->setText(tr("Loading library…"));
         return;
     }
     if (m_searchActive) {
