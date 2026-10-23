@@ -11,6 +11,7 @@
 
 <p align="center">
   <a href="https://github.com/hdmain/immich-desktop/releases/latest"><img src="https://img.shields.io/github/v/release/hdmain/immich-desktop?style=flat-square&label=release" alt="Release"></a>
+  <a href="https://github.com/hdmain/immich-desktop/releases/tag/beta"><img src="https://img.shields.io/badge/beta-rolling-orange?style=flat-square" alt="Beta"></a>
   <a href="https://github.com/hdmain/immich-desktop/stargazers"><img src="https://img.shields.io/github/stars/hdmain/immich-desktop?style=flat-square" alt="Stars"></a>
   <a href="https://github.com/hdmain/immich-desktop/network/members"><img src="https://img.shields.io/github/forks/hdmain/immich-desktop?style=flat-square" alt="Forks"></a>
   <a href="https://github.com/hdmain/immich-desktop/issues"><img src="https://img.shields.io/github/issues/hdmain/immich-desktop?style=flat-square" alt="Issues"></a>
@@ -19,7 +20,7 @@
   <a href="LICENSE.txt"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License"></a>
 </p>
 
-> **Unofficial project.** Fan-made desktop client , not affiliated with, maintained by, or endorsed by the official Immich project. Immich is a trademark of its respective owners. This app uses its own branding.
+> **Unofficial project.** Fan-made desktop client, not affiliated with, maintained by, or endorsed by the official Immich project. Immich is a trademark of its respective owners. This app uses its own branding.
 
 ## Showcase
 
@@ -27,17 +28,19 @@
 
 ## Features
 
-- **Library** - Immich-style timeline with compact rows and grouped days
+- **Library** - Immich-style timeline with day groups, Years view, zoomable grids (Ctrl+scroll), and progressive month loading
 - **Explore** - people, places, and recent media; open a person or place as an in-app Library-style gallery
+- **Viewer** - step through photos and videos with on-screen controls or arrow keys; optional info panel (date, camera, location, people, albums)
 - **Search** - find photos and videos across your library
 - **Folder Sync** - watch multiple local folders and auto-upload new photos/videos to Immich (Windows, macOS, Linux); add another folder with **+**
-- **Sharing** - create and copy photo/video share links from the context menu or media preview; links use your main Immich URL even when connected through Local URL
   - Optional **local-network only** mode: upload only when your Immich Local URL is reachable
   - Unsynced files show in Library immediately with an **unsaved** badge (saving / error icons while uploading)
-- **Upload & download** - drag-and-drop, paste, send media to the server, or save it locally
+- **Sharing** - create and copy photo/video share links (optional password) from the context menu or media preview
+- **Upload & download** - drag-and-drop, paste, send media to the server, or save it locally (original filename suggested)
 - **Video streaming** - built-in player with seek, volume, buffering, and muted hover preview
+- **mTLS** - optional client certificate (PKCS#12 or PEM) for Immich behind a reverse proxy
 - **Offline mode** - keep browsing with a local thumbnail/disk cache; uploads queue until online
-- **Themes** - light, dark, and custom palettes
+- **Themes** - light, dark, and custom palettes; collapsible sidebar
 - **Desktop extras** - system tray, close-to-tray, autostart, single-instance
 
 ## Install
@@ -57,7 +60,7 @@ sudo snap install immich-desktop
 ### Other packages
 
 Grab Windows (`.exe` / `.msi`), Linux `.deb`, or AppImage (`x86_64` / `aarch64`)
-from the [latest release](https://github.com/hdmain/immich-desktop/releases/latest).
+from the [latest release](https://github.com/hdmain/immich-desktop/releases/latest) (currently **v0.2.3**).
 Snap Store ships `amd64` and `arm64`.
 
 ## How to run
@@ -79,22 +82,24 @@ chmod +x immich-desktop-x86_64.AppImage   # or immich-desktop-aarch64.AppImage
 
 ### mTLS / Client Certificates
 
-If your Immich server is behind an mTLS reverse proxy, you can configure client certificate authentication in **Settings → Immich Server**. The desktop app supports **PKCS#12** (`.p12` / `.pfx`, single password-protected bundle) or **separate PEM certificate + PEM private key** files. You can also supply a custom CA certificate to verify servers with private or internal CAs. The private-key password can be stored (remembered) or you'll be prompted when needed via a "Remember password" checkbox. Client certificate authentication applies to the remote server URL only; the optional Local URL connects without it.
+If your Immich server is behind an mTLS reverse proxy, enable **Client certificate** in **Settings → Immich Server**. The app supports **PKCS#12** (`.p12` / `.pfx`) or **separate PEM certificate + PEM private key**, plus an optional custom CA. The key password can be remembered or prompted when needed. Client certificates apply to the remote server URL only; the optional Local URL connects without them.
 
 ## Roadmap
 
-Plans can shift , track progress and ideas in
+Plans can shift, track progress and ideas in
 [Issues](https://github.com/hdmain/immich-desktop/issues).
 
 ### Shipped
 
-- Library timeline with search, preview, trash, upload & download
+- Library timeline with search, Years view, zoomable grids, progressive month loading, preview, trash, upload & download
+- Shared viewer with photo/video navigation and an info panel (people, places, albums, EXIF)
 - Explore: people and places as in-page galleries (Library-style person/place views)
 - Folder Sync: multiple watched local folders, LAN-only upload option, unsaved/saving/error badges in Library
+- Share links with optional password; mTLS client certificates for reverse proxies
 - Video streaming player and hover preview
 - Offline browsing via local disk cache + queued uploads when offline
-- Themes (light / dark / custom), system tray, autostart, single-instance
-- Packaging: Windows installers, `.deb`, AppImage, Snap Store (`amd64` + `arm64`)
+- Themes (light / dark / custom), collapsible sidebar, system tray, autostart, single-instance
+- Packaging: Windows installers, `.deb`, AppImage, Snap Store (`amd64` + `arm64`), rolling beta on every `main` push
 
 ### Near term
 
@@ -102,11 +107,11 @@ Plans can shift , track progress and ideas in
 - **Bulk actions** - multi-select favorite, archive, download, trash, album assign
 - **Upload reliability** - pause/resume, per-file progress, clearer failure recovery
 - **Explore polish** - map improvements, people naming/merge hooks, better empty states
-- **Keyboard & UX** - shortcuts, smoother timeline scrolling, denser grid options
+- **Keyboard & UX** - more shortcuts and smoother scrolling
 
 ### Next
 
-- **Sharing** - album links, partner sharing, copy public URLs from the desktop
+- **Sharing** - album links, partner sharing, richer public URL workflows
 - **Memories & faces** - Immich memories feed and richer face/person management
 - **Smart library tools** - duplicates, archive views, advanced filters (type, camera, date)
 - **Notifications** - tray alerts for finished uploads and available updates
@@ -122,11 +127,13 @@ Plans can shift , track progress and ideas in
 
 ## Looking for collaborators
 
-I'm looking for people who want to co-build this project , and other projects too (mine or yours). Whether you want to contribute to **immich desktop**, start something new together, or get help on your own repo, reach out and let's figure out what to build.
+I'm looking for people who want to co-build this project, and other projects too (mine or yours). Whether you want to contribute to **immich desktop**, start something new together, or get help on your own repo, reach out and let's figure out what to build.
 
 **Contact - Discord:** `diegosanche3` · **GitHub:** [github.com/hdmain/immich-desktop](https://github.com/hdmain/immich-desktop) · **Issues:** [github.com/hdmain/immich-desktop/issues](https://github.com/hdmain/immich-desktop/issues)
 
-Ways to help right now: bug fixes, UX polish, Immich API coverage (albums, sharing, memories), packaging (Flatpak/Snap), and testing on different distros/GPUs. No pressure on scope , small PRs and ideas are welcome too. See `Settings → About` in the app for the full tech stack and links.
+Major community contributor: [gardar](https://github.com/gardar) (viewer navigation, zoomable grids, collapsible sidebar, info panel, and more).
+
+Ways to help right now: bug fixes, UX polish, Immich API coverage (albums, sharing, memories), packaging (Flatpak/Snap), and testing on different distros/GPUs. No pressure on scope, small PRs and ideas are welcome too. See `Settings → About` in the app for the full tech stack and links.
 
 ## Project layout
 
