@@ -113,6 +113,9 @@ AboutPage::AboutPage(QWidget *parent)
         l->addWidget(bodyLabel(
             tr("Built and maintained by the Immich Desktop community, led by "
                "<a href=\"https://github.com/hdmain\">hdmain</a>. "
+               "Major contributor: "
+               "<a href=\"https://github.com/gardar\">gardar</a> "
+               "(viewer navigation, zoomable grids, collapsible sidebar, info panel, and more). "
                "Contributions, bug reports, and ideas are welcome on GitHub."),
             c, true));
         auto *links = new QLabel(content);
