@@ -1,8 +1,19 @@
 #pragma once
 
+#include <QString>
+
 namespace Aurora::Config {
 
 inline constexpr char ApplicationVersion[] = "@PROJECT_VERSION@";
 inline constexpr char GitHubRepository[] = "@IMMICH_GITHUB_REPO@";
+inline constexpr char BuildInfo[] = "@IMMICH_BUILD_INFO@";
+
+// The version as shown to people, e.g. "v0.2.3" or "v0.2.3 (AUR)".
+inline QString displayVersion()
+{
+    const QString version = QStringLiteral("v") + QLatin1String(ApplicationVersion);
+    return BuildInfo[0] ? QStringLiteral("%1 (%2)").arg(version, QLatin1String(BuildInfo))
+                        : version;
+}
 
 } // namespace Aurora::Config
