@@ -1771,7 +1771,6 @@ void LibraryPage::layoutTimeline()
                 const int row = index / columns;
                 tile->setGeometry(kSidePad + col * (cellSize + kGridGap),
                                   startY + row * (cellSize + kGridGap), cellSize, cellSize);
-                tile->show();
                 ++index;
             }
         }
@@ -1825,7 +1824,6 @@ void LibraryPage::layoutTimeline()
                     width = availableWidth - used;
                 width = qMax(40, width);
                 tile->setGeometry(x, y, width, qRound(height));
-                tile->show();
                 x += width + kGap;
                 used += width + (i == row.size() - 1 ? 0 : kGap);
             }
@@ -1888,6 +1886,13 @@ void LibraryPage::updateVisibleMedia()
     // long scroll sessions don't retain every decoded thumb in tile widgets.
     const QRect keepRect(0, qMax(0, scrollTop - viewportHeight), m_timelineHost->width(),
                          viewportHeight * 3);
+
+    // Showing a tile for the first time is costly (style polish), so only tiles
+    // near the viewport are shown; a 700-photo month would otherwise stall the UI.
+    for (MediaTile *tile : std::as_const(m_tilesById)) {
+        if (tile)
+            tile->setVisible(keepRect.intersects(tile->geometry()));
+    }
 
     constexpr int kMaxThumbnailRequestsPerTick = 16;
     int requested = 0;
