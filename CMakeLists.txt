@@ -154,10 +154,18 @@ qt_add_executable(immich
 # AppImages and sandboxed packages use the same translations without extra paths.
 file(GLOB IMMICH_TS_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/translations/immich_*.ts")
 qt_add_translation(IMMICH_QM_FILES ${IMMICH_TS_FILES} OPTIONS -nounfinished)
+find_program(IMMICH_PYTHON NAMES python3 python)
+set(_immich_update_translation_status)
+if(IMMICH_PYTHON)
+    set(_immich_update_translation_status
+        COMMAND "${IMMICH_PYTHON}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/update_translation_status.py")
+endif()
 add_custom_target(update_translations
     COMMAND Qt6::lupdate "${CMAKE_CURRENT_SOURCE_DIR}/src"
         -no-obsolete -locations relative -source-language en -ts ${IMMICH_TS_FILES}
-    COMMENT "Updating translation source catalogs"
+    ${_immich_update_translation_status}
+    COMMENT "Updating translation source catalogs and README status table"
     VERBATIM
 )
 get_target_property(_immich_qmake Qt6::qmake IMPORTED_LOCATION)

@@ -2,14 +2,27 @@
 
 The source language is English. Qt Linguist catalogs (`immich_<locale>.ts`)
 contain application text, translator context, source locations and plural forms.
-English is complete; German and French currently provide initial translations
-for navigation and common actions. Unfinished translations appear in English.
+Unfinished translations appear in English.
 
 The app follows the operating system's preferred UI languages, trying regional
 and script variants before a base language, then falling back to English.
 Automatic mode keeps the system's regional date and number formats. Choose a
 specific language under **Settings → Appearance → Language** to override it.
 Restart the app after changing this setting.
+
+## Status
+
+<!-- translation-status:start -->
+
+| Language | Code | Progress | Strings |
+| --- | --- | --- | ---: |
+| English | `en` | `██████████` 100% | 546 / 546 |
+| German (Deutsch) | `de` | `███░░░░░░░` 29% | 160 / 546 |
+| French (Français) | `fr` | `███░░░░░░░` 29% | 160 / 546 |
+
+_Auto-generated from `translations/immich_*.ts`. Run `python tools/update_translation_status.py` or `cmake --build build --target update_translations`._
+
+<!-- translation-status:end -->
 
 ## Update an existing language
 
@@ -62,4 +75,5 @@ sentences together; use `%1` placeholders rather than concatenating words. Use
 `tr("%n item(s)", nullptr, count)` for counts, never English plural suffixes.
 Use `QLocale` for displayed dates and numbers. Keep API field names, resource
 paths, settings keys, filenames, CSS and other machine identifiers untranslated.
-Run `update_translations` when strings change and commit the updated catalogs.
+Run `update_translations` when strings change and commit the updated catalogs
+(that target also refreshes the completion table in this file and the root README).
