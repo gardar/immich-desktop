@@ -54,7 +54,9 @@ qt_add_resources(LocalizationTest test_translations PREFIX "/i18n"
 add_dependencies(LocalizationTest immich_translations)
 add_test(NAME LocalizationTest COMMAND LocalizationTest)
 
-qt_add_executable(LocalizationUiTest LocalizationUiTest.cpp)
+qt_add_executable(LocalizationUiTest
+    LocalizationUiTest.cpp
+    ${CMAKE_SOURCE_DIR}/resources/resources.qrc)
 target_link_libraries(LocalizationUiTest PRIVATE immich_app Qt6::Test)
 qt_add_resources(LocalizationUiTest ui_test_translations PREFIX "/i18n"
     FILES ${IMMICH_QM_FILES} ${IMMICH_QT_QM_FILES})
@@ -75,3 +77,8 @@ set_source_files_properties(${REMOTE_TEST_QM} PROPERTIES QT_RESOURCE_ALIAS "remo
 qt_add_resources(TranslationUpdaterTest updater_fixtures PREFIX "/fixtures" FILES ${REMOTE_TEST_QM})
 add_dependencies(TranslationUpdaterTest immich_translations)
 add_test(NAME TranslationUpdaterTest COMMAND TranslationUpdaterTest)
+
+if(IMMICH_PYTHON)
+    add_test(NAME PolishCatalogTest COMMAND "${IMMICH_PYTHON}" -X utf8
+        "${CMAKE_CURRENT_SOURCE_DIR}/PolishCatalogTest.py")
+endif()

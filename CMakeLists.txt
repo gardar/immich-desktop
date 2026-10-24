@@ -127,8 +127,20 @@ set(IMMICH_SOURCES
     src/ui/widgets/ZoomPanWidget.h
     src/ui/widgets/ZoomSlider.cpp
     src/ui/widgets/ZoomSlider.h
+)
+
+# Share the application UI with LocalizationUiTest. STATIC (not OBJECT): MSVC
+# + AUTORCC fails to link dependents against qrc_*.obj from OBJECT libraries.
+#
+# Icons/fonts (resources.qrc) and the Windows .ico (.rc) must live on the
+# *executable* targets. MinGW does not merge .rsrc from static libraries into
+# the PE, which left immich.exe with an empty resource table and no app icon.
+qt_add_library(immich_app STATIC ${IMMICH_SOURCES})
+qt_add_executable(immich WIN32
+    src/main.cpp
     resources/resources.qrc
 )
+target_link_libraries(immich PRIVATE immich_app)
 
 if(WIN32)
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
@@ -145,14 +157,8 @@ if(WIN32)
         COPYONLY
     )
     file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/immich.rc" "IDI_ICON1 ICON \"immich.ico\"\n")
-    list(APPEND IMMICH_SOURCES "${CMAKE_CURRENT_BINARY_DIR}/immich.rc")
+    target_sources(immich PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/immich.rc")
 endif()
-
-# Share the application UI with LocalizationUiTest. STATIC (not OBJECT): MSVC
-# + AUTORCC fails to link dependents against qrc_*.obj from OBJECT libraries.
-qt_add_library(immich_app STATIC ${IMMICH_SOURCES})
-qt_add_executable(immich WIN32 src/main.cpp)
-target_link_libraries(immich PRIVATE immich_app)
 
 # Qt 6.2-compatible Linguist workflow. Catalogs are embedded so installers,
 # AppImages and sandboxed packages use the same translations without extra paths.
@@ -281,18 +287,12 @@ if(UNIX AND NOT APPLE)
     install(FILES resources/immich-desktop.metainfo.xml
         DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo
     )
-    install(FILES resources/immich-logo-128.png
-        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/128x128/apps
-        RENAME immich-desktop.png
-    )
-    install(FILES resources/immich-logo-256.png
-        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps
-        RENAME immich-desktop.png
-    )
-    install(FILES resources/immich-logo-512.png
-        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/512x512/apps
-        RENAME immich-desktop.png
-    )
+    foreach(_immich_icon_size IN ITEMS 16 32 48 64 128 256 512)
+        install(FILES "resources/immich-logo-${_immich_icon_size}.png"
+            DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/${_immich_icon_size}x${_immich_icon_size}/apps"
+            RENAME immich-desktop.png
+        )
+    endforeach()
 endif()
 
 set(CPACK_PACKAGE_NAME "immich-desktop")

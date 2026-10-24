@@ -23,8 +23,6 @@ class LocalizationUiTest : public QObject {
 private slots:
     void changeLanguageFromSettings()
     {
-        Q_INIT_RESOURCE(resources);
-
         QTemporaryDir settings;
         QVERIFY(settings.isValid());
         QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, settings.path());
@@ -43,7 +41,7 @@ private slots:
         host.window()->showAppearanceSettings();
         host.window()->show();
 
-        for (const auto &language : {QStringLiteral("de"), QStringLiteral("fr"), QStringLiteral("en")}) {
+        for (const auto &language : {QStringLiteral("de"), QStringLiteral("fr"), QStringLiteral("pl"), QStringLiteral("en")}) {
             QPointer<Aurora::MainWindow> oldWindow(host.window());
             auto *combo = host.window()->findChild<QComboBox *>(QStringLiteral("languageCombo"));
             QVERIFY(combo);
@@ -61,19 +59,29 @@ private slots:
             QVERIFY(appearance);
             QTRY_VERIFY(appearance->isVisible());
             const QString expected = language == QStringLiteral("de") ? QStringLiteral("Darstellung")
-                : language == QStringLiteral("fr") ? QStringLiteral("Apparence") : QStringLiteral("Appearance");
+                : language == QStringLiteral("fr") ? QStringLiteral("Apparence")
+                : language == QStringLiteral("pl") ? QStringLiteral("Wygląd") : QStringLiteral("Appearance");
             bool headingFound = false;
             for (const auto *label : appearance->findChildren<QLabel *>())
                 headingFound |= label->text() == expected;
             QVERIFY2(headingFound, qPrintable(expected));
             const QString upload = language == QStringLiteral("de") ? QStringLiteral("Hochladen")
-                : language == QStringLiteral("fr") ? QStringLiteral("Importer") : QStringLiteral("Upload");
+                : language == QStringLiteral("fr") ? QStringLiteral("Importer")
+                : language == QStringLiteral("pl") ? QStringLiteral("Wyślij") : QStringLiteral("Upload");
             bool uploadFound = false;
             for (const auto *button : host.window()->findChildren<QPushButton *>())
                 uploadFound |= button->accessibleName() == upload && button->toolTip() == upload;
             QVERIFY2(uploadFound, qPrintable(upload));
             QVERIFY(originalClient);
             QVERIFY(originalSync);
+            if (language == QStringLiteral("pl")) {
+                const QString retry = QStringLiteral("Przerwano wysyłanie — nastąpi ponowna próba.");
+                emit client.requestFailed(Aurora::ImmichClient::tr("Upload"), retry, true);
+                bool retryFound = false;
+                for (const auto *label : host.window()->findChildren<QLabel *>())
+                    retryFound |= label->text() == retry + QStringLiteral(" (pozostało: 0)");
+                QVERIFY(retryFound);
+            }
         }
     }
 };
