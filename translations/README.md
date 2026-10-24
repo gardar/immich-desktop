@@ -11,15 +11,38 @@ specific language under **Settings → Appearance → Language** to override it.
 The interface refreshes immediately after changing this setting; ongoing uploads
 and folder watching continue without restarting the application.
 
+## Automatic downloads
+
+At startup and when a language is selected, the app checks the `translations`
+branch of the configured GitHub repository for `index.json` and compiled `.qm`
+catalogs. Startup waits at most five seconds for the entire update, then opens
+with the best available translations. No GitHub login or API token is required.
+
+Translation priority is: latest successfully downloaded catalog, last downloaded
+copy when offline, then the embedded catalog. Missing messages in a downloaded
+catalog also fall back to the embedded translation and finally English. Downloads
+are checked against the manifest's SHA-256 checksum, size and Qt catalog format,
+and saved atomically under the app's local data directory in `translations/`.
+A failed download never replaces a working cached copy. Newly published languages
+appear in the selector after their first successful download.
+
+Edit the `.ts` files on `main` as usual. **Publish translations** runs automatically
+when they change, compiles them with `lrelease -nounfinished`, and publishes a
+manifest plus catalogs to the `translations` branch. It can also be run manually
+with GitHub Actions' **Run workflow**. No application release or rebuild is needed
+to deliver translation edits. Keep changes to the generated branch in this
+workflow; its content-addressed filenames keep older manifests usable while
+GitHub's caches refresh. Embedded catalogs are still rebuilt for offline backups.
+
 ## Status
 
 <!-- translation-status:start -->
 
 | Language | Code | Progress | Strings |
 | --- | --- | --- | ---: |
-| English | `en` | `██████████` 100% | 546 / 546 |
-| German (Deutsch) | `de` | `███░░░░░░░` 29% | 160 / 546 |
-| French (Français) | `fr` | `███░░░░░░░` 29% | 160 / 546 |
+| English | `en` | `██████████` 100% | 547 / 547 |
+| German (Deutsch) | `de` | `███░░░░░░░` 29% | 161 / 547 |
+| French (Français) | `fr` | `███░░░░░░░` 29% | 161 / 547 |
 
 _Auto-generated from `translations/immich_*.ts`. Run `python tools/update_translation_status.py` or `cmake --build build --target update_translations`._
 

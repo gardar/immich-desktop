@@ -35,6 +35,7 @@ public:
     void scheduleStartupUpdateCheck();
     void scheduleGitHubStarPrompt();
     void showAppearanceSettings();
+    int currentPage() const { return m_pageIndex; }
 
 signals:
     void languageChangeRequested(const QString &language);
@@ -77,6 +78,7 @@ private:
     bool m_forceQuit = false;
     bool m_sslPasswordPromptOpen = false;
     int m_sslPasswordAttempts = 0;
+    int m_pageIndex = 0;
 };
 
 } // namespace Aurora

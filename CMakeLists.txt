@@ -45,6 +45,8 @@ set(IMMICH_SOURCES
     src/core/ImmichClient.h
     src/core/Localization.cpp
     src/core/Localization.h
+    src/core/TranslationUpdater.cpp
+    src/core/TranslationUpdater.h
     src/core/ImmichTypes.h
     src/core/OfflineStore.cpp
     src/core/OfflineStore.h

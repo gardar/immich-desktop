@@ -1,0 +1,55 @@
+name: Publish translations
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'translations/immich_*.ts'
+      - 'tools/publish_translations.py'
+      - '.github/workflows/translations.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-translations
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install translation compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qt6-l10n-tools
+      - name: Compile catalogs and manifest
+        run: python3 tools/publish_translations.py --lrelease /usr/lib/qt6/bin/lrelease --output "$RUNNER_TEMP/catalogs"
+      - name: Publish downloads to translations branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh auth setup-git
+          mkdir -p "$RUNNER_TEMP/translations-repo"
+          cd "$RUNNER_TEMP/translations-repo"
+          git init
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          if git ls-remote --exit-code origin refs/heads/translations; then
+            git fetch --depth=1 origin translations
+            git switch -c translations FETCH_HEAD
+          else
+            git switch -c translations
+          fi
+          # Content-addressed catalogs remain available for clients holding an
+          # older CDN-cached manifest. Publish the manifest in the same commit.
+          cp "$RUNNER_TEMP/catalogs/"* .
+          git add -- index.json '*.qm'
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "Publish translations from $GITHUB_SHA"
+          git push origin HEAD:refs/heads/translations

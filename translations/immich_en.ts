@@ -1979,12 +1979,12 @@ Drop files here, paste with Ctrl+V, or use Upload to add media.</translation>
     <name>Aurora::MainWindow</name>
     <message>
         <location filename="../src/ui/MainWindow.cpp" line="+234"/>
-        <location line="+220"/>
+        <location line="+222"/>
         <source>immich</source>
         <translation>immich</translation>
     </message>
     <message>
-        <location line="-217"/>
+        <location line="-219"/>
         <source>Show immich</source>
         <translation>Show immich</translation>
     </message>
@@ -1994,7 +1994,7 @@ Drop files here, paste with Ctrl+V, or use Upload to add media.</translation>
         <translation>Quit</translation>
     </message>
     <message>
-        <location line="+84"/>
+        <location line="+86"/>
         <source>Library</source>
         <translation>Library</translation>
     </message>
@@ -2920,6 +2920,11 @@ immich desktop  ·  %1</translation>
         <location filename="../src/ui/pages/LibraryPage.cpp" line="-2427"/>
         <source>Media files (*.jpg *.jpeg *.png *.gif *.webp *.heic *.heif *.tif *.tiff *.bmp *.raw *.dng *.cr2 *.nef *.arw *.mp4 *.mov *.m4v *.avi *.mkv *.webm *.3gp);;All files (*.*)</source>
         <translation>Media files (*.jpg *.jpeg *.png *.gif *.webp *.heic *.heif *.tif *.tiff *.bmp *.raw *.dng *.cr2 *.nef *.arw *.mp4 *.mov *.m4v *.avi *.mkv *.webm *.3gp);;All files (*.*)</translation>
+    </message>
+    <message>
+        <location filename="../src/main.cpp" line="+70"/>
+        <source>Updating translations…</source>
+        <translation>Updating translations…</translation>
     </message>
 </context>
 <context>

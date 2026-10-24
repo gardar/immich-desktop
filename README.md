@@ -158,6 +158,9 @@ Ways to help right now: bug fixes, UX polish, Immich API coverage (albums, shari
 
 The interface supports Qt translation catalogs and follows your system language.
 Choose **Settings → Appearance → Language** to override it; the interface refreshes immediately.
+The app automatically downloads current translations from GitHub at startup and
+when selecting a language. A saved copy and embedded catalogs provide offline fallback,
+so translation updates do not require a new app build.
 Unfinished strings fall back to English. See [the translation guide](translations/README.md)
 to help translate or add a language.
 
@@ -165,9 +168,9 @@ to help translate or add a language.
 
 | Language | Code | Progress | Strings |
 | --- | --- | --- | ---: |
-| English | `en` | `██████████` 100% | 546 / 546 |
-| German (Deutsch) | `de` | `███░░░░░░░` 29% | 160 / 546 |
-| French (Français) | `fr` | `███░░░░░░░` 29% | 160 / 546 |
+| English | `en` | `██████████` 100% | 547 / 547 |
+| German (Deutsch) | `de` | `███░░░░░░░` 29% | 161 / 547 |
+| French (Français) | `fr` | `███░░░░░░░` 29% | 161 / 547 |
 
 _Auto-generated from `translations/immich_*.ts`. Run `python tools/update_translation_status.py` or `cmake --build build --target update_translations`._
 

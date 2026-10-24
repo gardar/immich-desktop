@@ -319,6 +319,8 @@ void MainWindow::selectPage(int index)
     if (index < 0 || index > 6)
         return;
 
+    m_pageIndex = index;
+
     if (index == 0) {
         m_topBar->setPageTitle(tr("Library"));
         m_pages->setCurrentIndexAnimated(0);

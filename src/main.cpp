@@ -4,6 +4,7 @@
 #include "core/FolderSyncService.h"
 #include "core/ImmichClient.h"
 #include "core/Localization.h"
+#include "core/TranslationUpdater.h"
 #include "core/SingleInstance.h"
 #include "core/ThemeManager.h"
 #include "core/UpdateManager.h"
@@ -14,6 +15,9 @@
 
 #include <QApplication>
 #include <QFont>
+#include <QEventLoop>
+#include <QProgressDialog>
+#include <QTimer>
 #include <QGuiApplication>
 #include <QStyleFactory>
 #include <QSystemTrayIcon>
@@ -58,6 +62,24 @@ int main(int argc, char *argv[])
 
     const bool launchedFromAutoStart =
         application.arguments().contains(QStringLiteral("--autostart"));
+    Aurora::TranslationUpdater translationUpdater;
+    application.setQuitOnLastWindowClosed(false);
+    {
+        // Fetch before building the UI so this launch uses the latest catalogs.
+        // The updater's overall five-second deadline guarantees offline fallback.
+        QProgressDialog progress(QObject::tr("Updating translations…"), QString(), 0, 0);
+        progress.setWindowTitle(QStringLiteral("immich"));
+        progress.setCancelButton(nullptr);
+        QEventLoop ready;
+        QObject::connect(&translationUpdater, &Aurora::TranslationUpdater::finished,
+                         &ready, &QEventLoop::quit);
+        if (!launchedFromAutoStart)
+            QTimer::singleShot(300, &progress, &QWidget::show);
+        translationUpdater.refresh();
+        ready.exec();
+    }
+    application.setQuitOnLastWindowClosed(true);
+    localization.initialize(Aurora::AppSettings().loadLanguage());
 
     // Keep the OS autostart command pointed at the current executable after updates.
     if (Aurora::AppSettings().loadWindow().autoStart && Aurora::AutoStart::isSupported())
@@ -83,7 +105,7 @@ int main(int argc, char *argv[])
     Aurora::FolderSyncService folderSync(&immichClient);
 
     Aurora::MainWindowHost windows(&localization, &themeManager, &updateManager,
-                                   &immichClient, &folderSync);
+                                   &immichClient, &folderSync, &translationUpdater);
     QObject::connect(&singleInstance, &Aurora::SingleInstance::activationRequested,
                      &windows, [&windows] { windows.window()->raiseToFront(); });
 
