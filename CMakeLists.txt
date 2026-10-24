@@ -157,6 +157,8 @@ target_link_libraries(immich PRIVATE immich_app)
 # AppImages and sandboxed packages use the same translations without extra paths.
 file(GLOB IMMICH_TS_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/translations/immich_*.ts")
 qt_add_translation(IMMICH_QM_FILES ${IMMICH_TS_FILES} OPTIONS -nounfinished)
+# Explicit target so MSBuild parallel builds wait for lrelease before rcc embeds .qm.
+add_custom_target(immich_translations DEPENDS ${IMMICH_QM_FILES})
 find_program(IMMICH_PYTHON NAMES python3 python)
 set(_immich_update_translation_status)
 if(IMMICH_PYTHON)
@@ -188,6 +190,7 @@ foreach(qm_file IN LISTS IMMICH_QM_FILES IMMICH_QT_QM_FILES)
 endforeach()
 qt_add_resources(immich translations PREFIX "/i18n"
     FILES ${IMMICH_QM_FILES} ${IMMICH_QT_QM_FILES})
+add_dependencies(immich immich_translations)
 
 target_include_directories(immich_app PUBLIC
     src
