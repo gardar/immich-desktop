@@ -284,5 +284,6 @@ private slots:
     }
 };
 
-QTEST_MAIN(TlsConfigTest)
+// Guileless: no QGuiApplication / display — safe on headless CI runners.
+QTEST_GUILESS_MAIN(TlsConfigTest)
 #include "TlsConfigTest.moc"

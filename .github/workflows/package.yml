@@ -31,7 +31,9 @@ jobs:
         with:
           version: "6.8.3"
           arch: win64_msvc2022_64
-          modules: qtimageformats qtmultimedia qttools
+          # qttools/Linguist ship in the Qt 6.8 desktop base package — listing
+          # qttools as a module makes aqtinstall fail ("packages not found").
+          modules: qtimageformats qtmultimedia
           cache: true
 
       - name: Install installer toolchains
@@ -56,6 +58,8 @@ jobs:
         run: cmake --build build --config Release --parallel
 
       - name: Test
+        env:
+          QT_QPA_PLATFORM: offscreen
         run: ctest --test-dir build -C Release --output-on-failure
 
       - name: Create EXE and MSI installers
@@ -123,6 +127,8 @@ jobs:
         run: cmake --build build --parallel
 
       - name: Test
+        env:
+          QT_QPA_PLATFORM: offscreen
         run: ctest --test-dir build --output-on-failure
 
       - name: Create Debian package

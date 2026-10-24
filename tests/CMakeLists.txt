@@ -12,16 +12,14 @@ qt_add_executable(TlsConfigTest
 
 target_include_directories(TlsConfigTest PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
+# Core + Network only — QTEST_GUILESS_MAIN must not pull in a GUI platform plugin.
 target_link_libraries(TlsConfigTest PRIVATE
     Qt6::Core
-    Qt6::Gui
     Qt6::Network
     Qt6::Test
 )
 
 add_test(NAME TlsConfigTest COMMAND TlsConfigTest)
-# QTEST_MAIN builds a QGuiApplication (links Qt Gui); headless CI has no xcb display.
-set_tests_properties(TlsConfigTest PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 qt_add_executable(CustomHeadersTest
     CustomHeadersTest.cpp
