@@ -14,8 +14,9 @@ Restart the app after changing this setting.
 ## Update an existing language
 
 Install Qt's **Linguist Tools** alongside the normal build dependencies. On
-Debian/Ubuntu, install `qt6-tools-dev`, `qt6-l10n-tools`, and
-`qt6-translations-l10n`.
+Debian/Ubuntu, install `qt6-tools-dev`, `qt6-tools-dev-tools`, `qt6-l10n-tools`,
+and `qt6-translations-l10n`. The separate `qt6-tools-dev-tools` package supplies
+`lprodump`, which Qt's LinguistTools CMake targets also require.
 
 ```sh
 cmake -S . -B build
