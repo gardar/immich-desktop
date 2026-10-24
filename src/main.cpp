@@ -24,6 +24,10 @@
 
 int main(int argc, char *argv[])
 {
+    // resources.qrc lives in the immich_app static library; without an explicit
+    // init the linker may drop it and icons/fonts vanish at runtime.
+    Q_INIT_RESOURCE(resources);
+
     // Avoid rounded 100/125/150% steps that make fonts and icons look soft/pixelated.
     QGuiApplication::setHighDpiScaleFactorRoundingPolicy(
         Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);

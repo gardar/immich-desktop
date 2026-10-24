@@ -23,6 +23,8 @@ class LocalizationUiTest : public QObject {
 private slots:
     void changeLanguageFromSettings()
     {
+        Q_INIT_RESOURCE(resources);
+
         QTemporaryDir settings;
         QVERIFY(settings.isValid());
         QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, settings.path());
