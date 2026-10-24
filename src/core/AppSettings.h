@@ -82,6 +82,9 @@ class AppSettings final {
 public:
     AppSettings();
 
+    QString loadLanguage() const;
+    void saveLanguage(const QString &language);
+
     AppearanceSettings loadAppearance() const;
     void saveAppearance(const AppearanceSettings &appearance);
 

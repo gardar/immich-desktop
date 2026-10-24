@@ -313,27 +313,27 @@ void MainWindow::selectPage(int index)
         return;
 
     if (index == 0) {
-        m_topBar->setPageTitle(QStringLiteral("Library"));
+        m_topBar->setPageTitle(tr("Library"));
         m_pages->setCurrentIndexAnimated(0);
     } else if (index == 1) {
-        m_topBar->setPageTitle(QStringLiteral("Explore"));
+        m_topBar->setPageTitle(tr("Explore"));
         m_pages->setCurrentIndexAnimated(1);
     } else {
         if (index == 2) {
             m_settingsPage->showConnection();
-            m_topBar->setPageTitle(QStringLiteral("Settings / Immich Server"));
+            m_topBar->setPageTitle(tr("Settings / Immich Server"));
         } else if (index == 3) {
             m_settingsPage->showFolderSync();
-            m_topBar->setPageTitle(QStringLiteral("Settings / Folder Sync"));
+            m_topBar->setPageTitle(tr("Settings / Folder Sync"));
         } else if (index == 4) {
             m_settingsPage->showAppearance();
-            m_topBar->setPageTitle(QStringLiteral("Settings / Appearance"));
+            m_topBar->setPageTitle(tr("Settings / Appearance"));
         } else if (index == 5) {
             m_settingsPage->showUpdates();
-            m_topBar->setPageTitle(QStringLiteral("Settings / Update"));
+            m_topBar->setPageTitle(tr("Settings / Update"));
         } else {
             m_settingsPage->showAbout();
-            m_topBar->setPageTitle(QStringLiteral("Settings / About"));
+            m_topBar->setPageTitle(tr("Settings / About"));
         }
         m_pages->setCurrentIndexAnimated(2);
     }

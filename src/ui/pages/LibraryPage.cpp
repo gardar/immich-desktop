@@ -369,7 +369,7 @@ LibraryPage::LibraryPage(ThemeManager *themeManager, ImmichClient *client,
     m_searchDateTo->setAccessibleName(tr("To date"));
     for (auto *field : {m_searchDateFrom, m_searchDateTo}) {
         field->setCalendarPopup(true);
-        field->setDisplayFormat(QStringLiteral("yyyy-MM-dd"));
+        field->setDisplayFormat(QLocale().dateFormat(QLocale::ShortFormat));
         field->setEnabled(false);
     }
     dateRow->addWidget(m_searchDateEnabled);
@@ -979,8 +979,7 @@ void LibraryPage::handleNewestAssetsPolled(const QList<ImmichAsset> &assets)
         return;
 
     m_autoRefreshPending = true;
-    m_status->setText(tr("New photo%1 found , refreshing…")
-                          .arg(newCount == 1 ? QString() : QStringLiteral("s")));
+    m_status->setText(tr("%n new photo(s) found, refreshing…", nullptr, newCount));
     refresh();
 }
 
@@ -1045,9 +1044,7 @@ QString LibraryPage::formatDayHeader(const QDate &date) const
         return tr("Yesterday");
 
     const QLocale locale;
-    if (date.year() == today.year())
-        return locale.toString(date, QStringLiteral("dddd, MMMM d"));
-    return locale.toString(date, QStringLiteral("dddd, MMMM d, yyyy"));
+    return locale.toString(date, QLocale::LongFormat);
 }
 
 void LibraryPage::showAssets(const QList<ImmichAsset> &assets, const QString &nextPage,
@@ -2447,7 +2444,7 @@ void LibraryPage::enqueueUploads(const QStringList &paths)
         m_status->setText(
             tr("Queued %n file(s) for upload when online.", nullptr, uploadable.size()));
     } else {
-        m_status->setText(tr("Uploading %1 file(s)…").arg(m_client->pendingUploadCount() +
+        m_status->setText(tr("Uploading %n file(s)…", nullptr, m_client->pendingUploadCount() +
                                                           uploadable.size()));
     }
     m_client->uploadAssets(uploadable);

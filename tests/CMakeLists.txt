@@ -36,3 +36,15 @@ target_link_libraries(CustomHeadersTest PRIVATE
 )
 
 add_test(NAME CustomHeadersTest COMMAND CustomHeadersTest)
+
+qt_add_executable(LocalizationTest LocalizationTest.cpp
+    ${CMAKE_SOURCE_DIR}/src/core/Localization.cpp)
+target_include_directories(LocalizationTest PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(LocalizationTest PRIVATE Qt6::Core Qt6::Test)
+foreach(qm_file IN LISTS IMMICH_QM_FILES IMMICH_QT_QM_FILES)
+    get_filename_component(qm_name "${qm_file}" NAME)
+    set_source_files_properties("${qm_file}" PROPERTIES QT_RESOURCE_ALIAS "${qm_name}")
+endforeach()
+qt_add_resources(LocalizationTest test_translations PREFIX "/i18n"
+    FILES ${IMMICH_QM_FILES} ${IMMICH_QT_QM_FILES})
+add_test(NAME LocalizationTest COMMAND LocalizationTest)

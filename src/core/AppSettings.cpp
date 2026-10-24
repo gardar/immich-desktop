@@ -69,6 +69,16 @@ AppSettings::AppSettings()
 {
 }
 
+QString AppSettings::loadLanguage() const
+{
+    return m_settings.value(QStringLiteral("localization/language")).toString();
+}
+
+void AppSettings::saveLanguage(const QString &language)
+{
+    m_settings.setValue(QStringLiteral("localization/language"), language);
+}
+
 AppearanceSettings AppSettings::loadAppearance() const
 {
     AppearanceSettings result;

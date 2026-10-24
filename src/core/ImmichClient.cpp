@@ -1920,7 +1920,7 @@ void ImmichClient::loadImageAsync(const QString &assetId, const QString &resultS
                     return;
                 self->m_pendingImages.remove(pendingKey);
                 emit self->imageLoadFailed(assetId, resultSize, message);
-                emit self->requestFailed(self->tr("Load image"), message);
+                emit self->requestFailed(ImmichClient::tr("Load image"), message);
             }, Qt::QueuedConnection);
         };
 
@@ -1948,7 +1948,7 @@ void ImmichClient::loadImageAsync(const QString &assetId, const QString &resultS
                     const QPixmap pixmap = QPixmap::fromImage(image);
                     if (pixmap.isNull()) {
                         emit self->imageLoadFailed(assetId, resultSize,
-                                                   self->tr("Unsupported image format."));
+                                                   ImmichClient::tr("Unsupported image format."));
                         return;
                     }
                     if (resultSize == QStringLiteral("thumbnail")) {

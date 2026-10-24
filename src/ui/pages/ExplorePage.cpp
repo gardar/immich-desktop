@@ -769,9 +769,7 @@ QString ExplorePage::formatDayHeader(const QDate &date) const
     if (date == today.addDays(-1))
         return tr("Yesterday");
     const QLocale locale;
-    if (date.year() == today.year())
-        return locale.toString(date, QStringLiteral("dddd, MMMM d"));
-    return locale.toString(date, QStringLiteral("dddd, MMMM d, yyyy"));
+    return locale.toString(date, QLocale::LongFormat);
 }
 
 void ExplorePage::showFilteredAssets(const QString &filterKind, const QString &filterValue,

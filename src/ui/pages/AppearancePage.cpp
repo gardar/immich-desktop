@@ -2,6 +2,7 @@
 
 #include "core/AppSettings.h"
 #include "core/AutoStart.h"
+#include "core/Localization.h"
 #include "core/ThemeManager.h"
 #include "ui/pages/LibraryPage.h"
 #include "ui/IconUtils.h"
@@ -94,10 +95,10 @@ AppearancePage::AppearancePage(ThemeManager *themeManager, QWidget *parent)
     root->setContentsMargins(4, 6, 4, 4);
     root->setSpacing(8);
 
-    auto *heading = new QLabel(QStringLiteral("Appearance"), this);
+    auto *heading = new QLabel(tr("Appearance"), this);
     heading->setProperty("heading", true);
     auto *subheading = new QLabel(
-        QStringLiteral("Choose a preset or build a palette that belongs to your product."),
+        tr("Choose a preset or build a palette that belongs to your product."),
         this);
     subheading->setProperty("subheading", true);
     root->addWidget(heading);
@@ -112,14 +113,33 @@ AppearancePage::AppearancePage(ThemeManager *themeManager, QWidget *parent)
     contentRoot->setContentsMargins(0, 0, 8, 0);
     contentRoot->setSpacing(14);
 
+    QVBoxLayout *languageLayout = nullptr;
+    auto *languageCard = sectionCard(tr("Language"),
+        tr("Restart the application to apply a language change. Untranslated text appears in English."),
+        content, &languageLayout);
+    auto *languageCombo = new QComboBox(languageCard);
+    languageCombo->setObjectName(QStringLiteral("languageCombo"));
+    languageCombo->setAccessibleName(tr("Language"));
+    languageCombo->addItem(tr("System default"), QString());
+    for (const auto &language : Localization::availableLanguages()) {
+        const QLocale locale(language);
+        languageCombo->addItem(locale.nativeLanguageName(), language);
+    }
+    languageCombo->setCurrentIndex(qMax(0, languageCombo->findData(AppSettings().loadLanguage())));
+    languageLayout->addWidget(languageCombo, 0, Qt::AlignLeft);
+    contentRoot->addWidget(languageCard);
+    connect(languageCombo, &QComboBox::currentIndexChanged, this, [languageCombo] {
+        AppSettings().saveLanguage(languageCombo->currentData().toString());
+    });
+
     QVBoxLayout *presetLayout = nullptr;
     auto *presetCard = sectionCard(
-        QStringLiteral("Theme preset"),
-        QStringLiteral("Preset changes are applied immediately and saved automatically."),
+        tr("Theme preset"),
+        tr("Preset changes are applied immediately and saved automatically."),
         content, &presetLayout);
-    m_themeCombo->addItem(QStringLiteral("Light"), static_cast<int>(ThemePreset::Light));
-    m_themeCombo->addItem(QStringLiteral("Dark"), static_cast<int>(ThemePreset::Dark));
-    m_themeCombo->addItem(QStringLiteral("Custom"), static_cast<int>(ThemePreset::Custom));
+    m_themeCombo->addItem(tr("Light"), static_cast<int>(ThemePreset::Light));
+    m_themeCombo->addItem(tr("Dark"), static_cast<int>(ThemePreset::Dark));
+    m_themeCombo->addItem(tr("Custom"), static_cast<int>(ThemePreset::Custom));
     presetLayout->addWidget(m_themeCombo, 0, Qt::AlignLeft);
     contentRoot->addWidget(presetCard);
 
@@ -152,23 +172,23 @@ AppearancePage::AppearancePage(ThemeManager *themeManager, QWidget *parent)
 
     QVBoxLayout *paletteLayout = nullptr;
     auto *paletteCard = sectionCard(
-        QStringLiteral("Custom palette"),
-        QStringLiteral("Choosing a color automatically activates the Custom theme."),
+        tr("Custom palette"),
+        tr("Choosing a color automatically activates the Custom theme."),
         content, &paletteLayout);
     auto *colorGrid = new QGridLayout;
     colorGrid->setSpacing(10);
-    colorGrid->addWidget(new ColorButton(QStringLiteral("Background"), ColorRole::Background,
+    colorGrid->addWidget(new ColorButton(tr("Background"), ColorRole::Background,
                                          themeManager, paletteCard), 0, 0);
-    colorGrid->addWidget(new ColorButton(QStringLiteral("Panels"), ColorRole::Panel,
+    colorGrid->addWidget(new ColorButton(tr("Panels"), ColorRole::Panel,
                                          themeManager, paletteCard), 0, 1);
-    colorGrid->addWidget(new ColorButton(QStringLiteral("Buttons"), ColorRole::Button,
+    colorGrid->addWidget(new ColorButton(tr("Buttons"), ColorRole::Button,
                                          themeManager, paletteCard), 1, 0);
-    colorGrid->addWidget(new ColorButton(QStringLiteral("Accent"), ColorRole::Accent,
+    colorGrid->addWidget(new ColorButton(tr("Accent"), ColorRole::Accent,
                                          themeManager, paletteCard), 1, 1);
     colorGrid->setColumnStretch(0, 1);
     colorGrid->setColumnStretch(1, 1);
     paletteLayout->addLayout(colorGrid);
-    auto *reset = new QPushButton(QStringLiteral("Reset custom colors"), paletteCard);
+    auto *reset = new QPushButton(tr("Reset custom colors"), paletteCard);
     reset->setCursor(Qt::PointingHandCursor);
     configureActionButton(reset, QStringLiteral(":/icons/refresh-cw.svg"));
     paletteLayout->addWidget(reset, 0, Qt::AlignLeft);

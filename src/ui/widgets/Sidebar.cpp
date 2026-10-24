@@ -162,13 +162,13 @@ void Sidebar::showMainNavigation()
         return;
 
     m_settingsMode = false;
-    m_navigationLabel->setText(QStringLiteral("NAVIGATION"));
+    m_navigationLabel->setText(tr("NAVIGATION"));
     clearNavigation();
-    addNavigation(QStringLiteral("Library"),
+    addNavigation(tr("Library"),
                   QStringLiteral(":/icons/images.svg"), 0);
-    addNavigation(QStringLiteral("Explore"),
+    addNavigation(tr("Explore"),
                   QStringLiteral(":/icons/layout-dashboard.svg"), 1);
-    addNavigation(QStringLiteral("Settings"),
+    addNavigation(tr("Settings"),
                   QStringLiteral(":/icons/settings.svg"), 2);
     if (auto *libraryButton = m_navigationGroup->button(0))
         libraryButton->setChecked(true);
@@ -180,19 +180,19 @@ void Sidebar::showSettingsNavigation()
         return;
 
     m_settingsMode = true;
-    m_navigationLabel->setText(QStringLiteral("SETTINGS"));
+    m_navigationLabel->setText(tr("SETTINGS"));
     clearNavigation();
-    addNavigation(QStringLiteral("Immich Server"),
+    addNavigation(tr("Immich Server"),
                   QStringLiteral(":/icons/server.svg"), 2);
-    addNavigation(QStringLiteral("Folder Sync"),
+    addNavigation(tr("Folder Sync"),
                   QStringLiteral(":/icons/folder-sync.svg"), 3);
-    addNavigation(QStringLiteral("Appearance"),
+    addNavigation(tr("Appearance"),
                   QStringLiteral(":/icons/palette.svg"), 4);
-    addNavigation(QStringLiteral("Update"),
+    addNavigation(tr("Update"),
                   QStringLiteral(":/icons/refresh-cw.svg"), 5);
-    addNavigation(QStringLiteral("About"),
+    addNavigation(tr("About"),
                   QStringLiteral(":/icons/star.svg"), 6);
-    addNavigation(QStringLiteral("Back"),
+    addNavigation(tr("Back"),
                   QStringLiteral(":/icons/arrow-left.svg"), 0, false);
 }
 

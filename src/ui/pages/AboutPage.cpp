@@ -141,22 +141,22 @@ AboutPage::AboutPage(QWidget *parent)
             tr("Everything this build is made with , frameworks, packaging, and key libraries:"),
             c));
         const QStringList items = {
-            QStringLiteral("Qt 6 - Core, Gui, Widgets, Network, Svg"),
-            QStringLiteral("Qt Multimedia (+ MultimediaWidgets) - video playback & audio (QMediaPlayer, QVideoSink)"),
-            QStringLiteral("GStreamer / FFmpeg - media backends behind Qt Multimedia (selected at runtime)"),
-            QStringLiteral("CMake + Ninja - build system"),
-            QStringLiteral("C++20 - language standard"),
-            QStringLiteral("QSettings (INI) - AppSettings persistence (appearance, updates, server, playback)"),
-            QStringLiteral("QSystemTrayIcon - tray, notifications, close-to-tray"),
-            QStringLiteral("QLocalServer / QLocalSocket - SingleInstance (single-instance + raise)"),
-            QStringLiteral("Inter font family - bundled UI typeface (via FontLoader)"),
-            QStringLiteral("Lucide icons - SVG icon set"),
-            QStringLiteral("linuxdeploy + linuxdeploy-plugin-qt - AppImage bundling"),
-            QStringLiteral("CPack - DEB / NSIS / WiX (MSI) installers"),
-            QStringLiteral("Snapcraft (core24 + gnome extension) - Snap package"),
-            QStringLiteral("Flatpak (org.kde.Platform / Sdk) - Flatpak manifest"),
-            QStringLiteral("GitHub Actions - CI for Windows/Linux/Snap + tagged releases"),
-            QStringLiteral("NSIS & WiX Toolset - Windows installers"),
+            tr("Qt 6 - Core, Gui, Widgets, Network, Svg"),
+            tr("Qt Multimedia (+ MultimediaWidgets) - video playback & audio (QMediaPlayer, QVideoSink)"),
+            tr("GStreamer / FFmpeg - media backends behind Qt Multimedia (selected at runtime)"),
+            tr("CMake + Ninja - build system"),
+            tr("C++20 - language standard"),
+            tr("QSettings (INI) - AppSettings persistence (appearance, updates, server, playback)"),
+            tr("QSystemTrayIcon - tray, notifications, close-to-tray"),
+            tr("QLocalServer / QLocalSocket - SingleInstance (single-instance + raise)"),
+            tr("Inter font family - bundled UI typeface (via FontLoader)"),
+            tr("Lucide icons - SVG icon set"),
+            tr("linuxdeploy + linuxdeploy-plugin-qt - AppImage bundling"),
+            tr("CPack - DEB / NSIS / WiX (MSI) installers"),
+            tr("Snapcraft (core24 + gnome extension) - Snap package"),
+            tr("Flatpak (org.kde.Platform / Sdk) - Flatpak manifest"),
+            tr("GitHub Actions - CI for Windows/Linux/Snap + tagged releases"),
+            tr("NSIS & WiX Toolset - Windows installers"),
         };
         auto *bullets = new QLabel(c);
         bullets->setProperty("subheading", true);
@@ -214,7 +214,7 @@ AboutPage::AboutPage(QWidget *parent)
         btnRow->addStretch();
         l->addLayout(btnRow);
 
-        l->addWidget(monoLabel(QStringLiteral("Discord handle: diegosanche3"), c));
+        l->addWidget(monoLabel(tr("Discord handle: diegosanche3"), c));
         contentLayout->addWidget(c);
     }
 

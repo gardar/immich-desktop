@@ -14,7 +14,7 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
 find_package(Qt6 6.2 REQUIRED COMPONENTS
-    Core Gui Multimedia MultimediaWidgets Network Svg Widgets
+    Core Gui LinguistTools Multimedia MultimediaWidgets Network Svg Widgets
 )
 
 set(IMMICH_GITHUB_REPO "hdmain/immich-desktop" CACHE STRING
@@ -44,6 +44,8 @@ set(IMMICH_SOURCES
     src/core/FolderSyncService.h
     src/core/ImmichClient.cpp
     src/core/ImmichClient.h
+    src/core/Localization.cpp
+    src/core/Localization.h
     src/core/ImmichTypes.h
     src/core/OfflineStore.cpp
     src/core/OfflineStore.h
@@ -147,6 +149,34 @@ qt_add_executable(immich
     WIN32
     ${IMMICH_SOURCES}
 )
+
+# Qt 6.2-compatible Linguist workflow. Catalogs are embedded so installers,
+# AppImages and sandboxed packages use the same translations without extra paths.
+file(GLOB IMMICH_TS_FILES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/translations/immich_*.ts")
+qt_add_translation(IMMICH_QM_FILES ${IMMICH_TS_FILES} OPTIONS -nounfinished)
+add_custom_target(update_translations
+    COMMAND Qt6::lupdate "${CMAKE_CURRENT_SOURCE_DIR}/src"
+        -no-obsolete -locations relative -source-language en -ts ${IMMICH_TS_FILES}
+    COMMENT "Updating translation source catalogs"
+    VERBATIM
+)
+get_target_property(_immich_qmake Qt6::qmake IMPORTED_LOCATION)
+execute_process(COMMAND "${_immich_qmake}" -query QT_INSTALL_TRANSLATIONS
+    OUTPUT_VARIABLE _immich_qt_translations OUTPUT_STRIP_TRAILING_WHITESPACE)
+set(IMMICH_QT_QM_FILES)
+foreach(ts_file IN LISTS IMMICH_TS_FILES)
+    get_filename_component(catalog "${ts_file}" NAME_WE)
+    string(REGEX REPLACE "^immich_" "" language "${catalog}")
+    if(EXISTS "${_immich_qt_translations}/qtbase_${language}.qm")
+        list(APPEND IMMICH_QT_QM_FILES "${_immich_qt_translations}/qtbase_${language}.qm")
+    endif()
+endforeach()
+foreach(qm_file IN LISTS IMMICH_QM_FILES IMMICH_QT_QM_FILES)
+    get_filename_component(qm_name "${qm_file}" NAME)
+    set_source_files_properties("${qm_file}" PROPERTIES QT_RESOURCE_ALIAS "${qm_name}")
+endforeach()
+qt_add_resources(immich translations PREFIX "/i18n"
+    FILES ${IMMICH_QM_FILES} ${IMMICH_QT_QM_FILES})
 
 target_include_directories(immich PRIVATE
     src

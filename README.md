@@ -154,9 +154,17 @@ Major community contributor: [gardar](https://github.com/gardar) (viewer navigat
 
 Ways to help right now: bug fixes, UX polish, Immich API coverage (albums, sharing, memories), packaging (Flatpak/Snap), and testing on different distros/GPUs. No pressure on scope, small PRs and ideas are welcome too. See `Settings → About` in the app for the full tech stack and links.
 
+## Translations
+
+The interface supports Qt translation catalogs and follows your system language.
+Choose **Settings → Appearance → Language** to override it, then restart the app.
+English is complete; German and French have initial translations, with English
+fallback for unfinished text. See [the translation guide](translations/README.md)
+to help translate or add a language.
+
 ## Building from source
 
-Requires CMake 3.21+ and Qt 6.2+ (Core, Gui, Widgets, Network, Svg, Multimedia). Install
+Requires CMake 3.21+ and Qt 6.2+ (Core, Gui, Widgets, Network, Svg, Multimedia, LinguistTools). Install
 `qt6-imageformats` (or your distro's equivalent) at runtime so WebP thumbnails can be decoded.
 
 ```bash

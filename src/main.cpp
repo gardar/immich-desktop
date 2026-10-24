@@ -3,6 +3,7 @@
 #include "core/AutoStart.h"
 #include "core/FolderSyncService.h"
 #include "core/ImmichClient.h"
+#include "core/Localization.h"
 #include "core/SingleInstance.h"
 #include "core/ThemeManager.h"
 #include "core/UpdateManager.h"
@@ -43,6 +44,9 @@ int main(int argc, char *argv[])
     else
         QGuiApplication::setDesktopFileName(QStringLiteral("immich-desktop"));
 #endif
+
+    Aurora::Localization localization;
+    localization.initialize(Aurora::AppSettings().loadLanguage());
 
     application.setWindowIcon(Aurora::applicationIcon());
     application.setStyle(QStyleFactory::create(QStringLiteral("Fusion")));

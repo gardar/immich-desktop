@@ -31,7 +31,7 @@ jobs:
         with:
           version: "6.8.3"
           arch: win64_msvc2022_64
-          modules: qtimageformats qtmultimedia
+          modules: qtimageformats qtmultimedia qttools
           cache: true
 
       - name: Install installer toolchains
@@ -54,6 +54,9 @@ jobs:
       - name: Build
         shell: powershell
         run: cmake --build build --config Release --parallel
+
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
 
       - name: Create EXE and MSI installers
         shell: powershell
@@ -105,6 +108,9 @@ jobs:
             patchelf \
             qt6-base-dev \
             qt6-base-dev-tools \
+            qt6-tools-dev \
+            qt6-l10n-tools \
+            qt6-translations-l10n \
             qt6-image-formats-plugins \
             qt6-multimedia-dev \
             wget
@@ -114,6 +120,9 @@ jobs:
 
       - name: Build
         run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
 
       - name: Create Debian package
         run: |

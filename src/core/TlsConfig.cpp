@@ -2,6 +2,7 @@
 
 #include "core/AppSettings.h"
 
+#include <QCoreApplication>
 #include <QFile>
 #include <QList>
 #include <QSslCertificate>
@@ -21,7 +22,8 @@ bool readFile(const QString &path, QByteArray &out, QString &error)
 {
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) {
-        error = QStringLiteral("Could not open %1: %2").arg(path, file.errorString());
+        error = QCoreApplication::translate("TlsConfig", "Could not open %1: %2")
+                    .arg(path, file.errorString());
         return false;
     }
     out = file.readAll();
@@ -32,12 +34,13 @@ TlsConfigResult buildPkcs12(const ImmichConnectionSettings &conn, const QString 
                             QSslConfiguration config)
 {
     if (password.isEmpty()) {
-        return fail(QStringLiteral("A password is required to open the PKCS#12 bundle."), true);
+        return fail(QCoreApplication::translate("TlsConfig",
+                        "A password is required to open the PKCS#12 bundle."), true);
     }
 
     QFile file(conn.clientCertPath);
     if (!file.open(QIODevice::ReadOnly)) {
-        return fail(QStringLiteral("Could not open %1: %2")
+        return fail(QCoreApplication::translate("TlsConfig", "Could not open %1: %2")
                         .arg(conn.clientCertPath, file.errorString()));
     }
 
@@ -47,8 +50,9 @@ TlsConfigResult buildPkcs12(const ImmichConnectionSettings &conn, const QString 
     const bool imported =
         QSslCertificate::importPkcs12(&file, &key, &cert, &caCerts, password.toUtf8());
     if (!imported) {
-        return fail(QStringLiteral("Could not read the PKCS#12 bundle. The password may be "
-                                   "wrong, or the file is not a valid bundle."),
+        return fail(QCoreApplication::translate("TlsConfig",
+                        "Could not read the PKCS#12 bundle. The password may be "
+                        "wrong, or the file is not a valid bundle."),
                     false, /*badPassword=*/true);
     }
 
@@ -71,7 +75,8 @@ TlsConfigResult buildPem(const ImmichConnectionSettings &conn, const QString &pa
 {
     const auto certs = QSslCertificate::fromPath(conn.clientCertPath, QSsl::Pem);
     if (certs.isEmpty() || certs.first().isNull()) {
-        return fail(QStringLiteral("Could not read a client certificate from %1.")
+        return fail(QCoreApplication::translate("TlsConfig",
+                        "Could not read a client certificate from %1.")
                         .arg(conn.clientCertPath));
     }
 
@@ -87,8 +92,9 @@ TlsConfigResult buildPem(const ImmichConnectionSettings &conn, const QString &pa
     }
     if (key.isNull()) {
         const bool needsPassword = password.isEmpty();
-        return fail(QStringLiteral("Could not read the private key from %1. The key may be "
-                                   "encrypted and need a password, or the password is wrong.")
+        return fail(QCoreApplication::translate("TlsConfig",
+                        "Could not read the private key from %1. The key may be "
+                        "encrypted and need a password, or the password is wrong.")
                         .arg(conn.clientKeyPath),
                     needsPassword, /*badPassword=*/!needsPassword);
     }
@@ -129,8 +135,8 @@ TlsConfigResult build(const ImmichConnectionSettings &conn, const QString &passw
             cas = QSslCertificate::fromData(caBytes, QSsl::Der);
         }
         if (cas.isEmpty() || cas.first().isNull()) {
-            return fail(QStringLiteral("Could not read a CA certificate from %1 "
-                                       "(tried PEM and DER).")
+            return fail(QCoreApplication::translate("TlsConfig",
+                            "Could not read a CA certificate from %1 (tried PEM and DER).")
                             .arg(conn.caCertPath));
         }
         auto merged = config.caCertificates();
