@@ -1521,16 +1521,16 @@ to explore people, places, and recent media.</source>
     </message>
     <message>
         <location line="+157"/>
-        <location line="+1320"/>
+        <location line="+1317"/>
         <source>Loading library…</source>
         <translation>Chargement de la photothèque…</translation>
     </message>
     <message numerus="yes">
-        <location line="-1238"/>
+        <location line="-1235"/>
         <location line="+42"/>
         <location line="+283"/>
         <location line="+158"/>
-        <location line="+788"/>
+        <location line="+785"/>
         <source>%n item(s)</source>
         <translation>
             <numerusform>%n élément</numerusform>
@@ -1538,7 +1538,7 @@ to explore people, places, and recent media.</source>
         </translation>
     </message>
     <message>
-        <location line="-1268"/>
+        <location line="-1265"/>
         <source>Loading library… %1/%2 months</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1703,7 +1703,7 @@ to explore people, places, and recent media.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+18"/>
+        <location line="+15"/>
         <location line="+759"/>
         <source>Upload finished: %1 ok, %2 failed</source>
         <translation type="unfinished"></translation>
@@ -2908,12 +2908,12 @@ immich desktop  ·  %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ui/pages/LibraryPage.cpp" line="-2427"/>
+        <location filename="../src/ui/pages/LibraryPage.cpp" line="-2424"/>
         <source>Media files (*.jpg *.jpeg *.png *.gif *.webp *.heic *.heif *.tif *.tiff *.bmp *.raw *.dng *.cr2 *.nef *.arw *.mp4 *.mov *.m4v *.avi *.mkv *.webm *.3gp);;All files (*.*)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/main.cpp" line="+70"/>
+        <location filename="../src/main.cpp" line="+74"/>
         <source>Updating translations…</source>
         <translation>Mise à jour des traductions…</translation>
     </message>

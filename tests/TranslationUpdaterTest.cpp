@@ -155,14 +155,14 @@ private slots:
         QTemporaryDir cache;
         CatalogServer server;
         QVERIFY(server.listen(QHostAddress::LocalHost));
-        server.catalog(fixture(), QStringLiteral("pl"));
+        server.catalog(fixture(), QStringLiteral("es"));
         Aurora::TranslationUpdater updater(nullptr, cache.path(), server.url());
         QSignalSpy finished(&updater, &Aurora::TranslationUpdater::finished);
         updater.refresh();
         QTRY_COMPARE(finished.size(), 1);
-        QVERIFY(Aurora::Localization::availableLanguages(cache.path()).contains(QStringLiteral("pl")));
+        QVERIFY(Aurora::Localization::availableLanguages(cache.path()).contains(QStringLiteral("es")));
         Aurora::Localization localization(cache.path());
-        localization.initialize(QStringLiteral("pl"));
+        localization.initialize(QStringLiteral("es"));
         QCOMPARE(QCoreApplication::translate("Aurora::Sidebar", "Library"), QStringLiteral("Remote library"));
         QCOMPARE(QCoreApplication::translate("Aurora::LibraryPage", "%n item(s)", nullptr, 1), QStringLiteral("1 item"));
         server.catalog(fixture(), QStringLiteral("../escape"));

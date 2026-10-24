@@ -119,7 +119,7 @@ signals:
     void assetsDeleted(const QStringList &assetIds, bool permanent);
     void sharedLinkCreated(const QUuid &requestId, const QUrl &url);
     void sharedLinkFailed(const QUuid &requestId, const QString &message);
-    void requestFailed(const QString &operation, const QString &message);
+    void requestFailed(const QString &operation, const QString &message, bool willRetry = false);
     void transferActivityChanged();
     void sslPasswordNeeded();
 

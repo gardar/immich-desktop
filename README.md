@@ -161,6 +161,7 @@ Choose **Settings → Appearance → Language** to override it; the interface re
 The app automatically downloads current translations from GitHub at startup and
 when selecting a language. A saved copy and embedded catalogs provide offline fallback,
 so translation updates do not require a new app build.
+Polish covers all application messages, including its three plural forms.
 Unfinished strings fall back to English. See [the translation guide](translations/README.md)
 to help translate or add a language.
 
@@ -171,6 +172,7 @@ to help translate or add a language.
 | English | `en` | `██████████` 100% | 547 / 547 |
 | German (Deutsch) | `de` | `███░░░░░░░` 29% | 161 / 547 |
 | French (Français) | `fr` | `███░░░░░░░` 29% | 161 / 547 |
+| Polish (Polski) | `pl` | `██████████` 100% | 547 / 547 |
 
 _Auto-generated from `translations/immich_*.ts`. Run `python tools/update_translation_status.py` or `cmake --build build --target update_translations`._
 

@@ -1398,7 +1398,7 @@ bool ImmichClient::startUpload(const QString &filePath)
             emit requestFailed(
                 tr("Upload"),
                 tr("Could not open %1: %2 (will retry)")
-                    .arg(info.fileName(), message));
+                    .arg(info.fileName(), message), true);
         }
         return false;
     }
@@ -1474,7 +1474,7 @@ bool ImmichClient::startUpload(const QString &filePath)
                 emit requestFailed(
                     tr("Upload"),
                     tr("%1 interrupted - queued for retry when online.")
-                        .arg(QFileInfo(filePath).fileName()));
+                        .arg(QFileInfo(filePath).fileName()), true);
             } else {
                 m_uploadRetryCounts.remove(filePath);
                 m_uploadQueueStore.remove(filePath);

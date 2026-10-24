@@ -85,7 +85,7 @@ private slots:
     void showThumbnail(const QString &assetId, const QPixmap &thumbnail);
     void showThumbnailError(const QString &assetId, const QString &resultSize,
                             const QString &message);
-    void showRequestError(const QString &operation, const QString &message);
+    void showRequestError(const QString &operation, const QString &message, bool willRetry = false);
     void handleAssetInfoLoaded(const Aurora::ImmichAsset &asset);
     void handleAssetInfoFailed(const QString &assetId, const QString &message);
     void pasteFromClipboard();

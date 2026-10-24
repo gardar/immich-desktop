@@ -1695,7 +1695,7 @@ void LibraryPage::showThumbnailError(const QString &assetId, const QString &resu
     });
 }
 
-void LibraryPage::showRequestError(const QString &operation, const QString &message)
+void LibraryPage::showRequestError(const QString &operation, const QString &message, bool willRetry)
 {
     if (operation == tr("Load image"))
         return;
@@ -1709,9 +1709,6 @@ void LibraryPage::showRequestError(const QString &operation, const QString &mess
             if (message.contains(QFileInfo(path).fileName()))
                 cleanupPasteTemp(path);
         }
-        const bool willRetry = message.contains(QStringLiteral("will retry"), Qt::CaseInsensitive) ||
-                               message.contains(QStringLiteral("queued for retry"),
-                                                Qt::CaseInsensitive);
         if (!willRetry)
             ++m_uploadsFailed;
         const int remaining = m_client->pendingUploadCount();

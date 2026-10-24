@@ -1,0 +1,52 @@
+"""Keep the Polish catalog complete and preserve runtime formatting tokens."""
+
+from pathlib import Path
+import re
+import unittest
+import xml.etree.ElementTree as ET
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def messages(path):
+    root = ET.parse(path).getroot()
+    entries = {}
+    for context in root.findall('context'):
+        for message in context.findall('message'):
+            key = (context.findtext('name'), message.findtext('source'),
+                   message.findtext('comment', ''), message.get('numerus', 'no'))
+            entries[key] = message
+    return root, entries
+
+
+class PolishCatalogTest(unittest.TestCase):
+    def test_complete_catalog_and_formatting(self):
+        _, english = messages(ROOT / 'translations/immich_en.ts')
+        polish_root, polish = messages(ROOT / 'translations/immich_pl.ts')
+        self.assertEqual(polish_root.get('language'), 'pl')
+        self.assertEqual(english.keys(), polish.keys(), 'Polish must cover every source message')
+        for key, message in polish.items():
+            with self.subTest(context=key[0], source=key[1]):
+                source = key[1]
+                translation = message.find('translation')
+                self.assertIsNotNone(translation)
+                self.assertNotIn(translation.get('type'), ('unfinished', 'obsolete', 'vanished'))
+                if message.get('numerus') == 'yes':
+                    forms = [form.text or '' for form in translation.findall('numerusform')]
+                    self.assertEqual(len(forms), 3, 'Polish requires three plural forms')
+                else:
+                    forms = [translation.text or '']
+                for form in forms:
+                    self.assertTrue(form.strip())
+                    self.assertEqual(sorted(re.findall(r'%L?\d+|%n|%p', source)),
+                                     sorted(re.findall(r'%L?\d+|%n|%p', form)))
+                    self.assertEqual(re.findall(r'<[^>]+>', source), re.findall(r'<[^>]+>', form))
+                    self.assertEqual(source.count('\n'), form.count('\n'))
+                    # File dialog filter patterns must stay functional after translation.
+                    self.assertEqual(re.findall(r'\*\.[a-z0-9]+|\(\*\.\*\)', source),
+                                     re.findall(r'\*\.[a-z0-9]+|\(\*\.\*\)', form))
+
+
+if __name__ == '__main__':
+    unittest.main()

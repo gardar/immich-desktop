@@ -3,6 +3,8 @@
 The source language is English. Qt Linguist catalogs (`immich_<locale>.ts`)
 contain application text, translator context, source locations and plural forms.
 Unfinished translations appear in English.
+Polish is fully translated, including all three Polish plural forms. The catalog
+is published automatically and can be downloaded by existing app installations.
 
 The app follows the operating system's preferred UI languages, trying regional
 and script variants before a base language, then falling back to English.
@@ -43,6 +45,7 @@ GitHub's caches refresh. Embedded catalogs are still rebuilt for offline backups
 | English | `en` | `██████████` 100% | 547 / 547 |
 | German (Deutsch) | `de` | `███░░░░░░░` 29% | 161 / 547 |
 | French (Français) | `fr` | `███░░░░░░░` 29% | 161 / 547 |
+| Polish (Polski) | `pl` | `██████████` 100% | 547 / 547 |
 
 _Auto-generated from `translations/immich_*.ts`. Run `python tools/update_translation_status.py` or `cmake --build build --target update_translations`._
 

@@ -13,6 +13,7 @@ private slots:
         QVERIFY(languages.contains(QStringLiteral("en")));
         QVERIFY(languages.contains(QStringLiteral("de")));
         QVERIFY(languages.contains(QStringLiteral("fr")));
+        QVERIFY(languages.contains(QStringLiteral("pl")));
     }
 
     void selection_data()
@@ -37,6 +38,10 @@ private slots:
             << QString("en") << QString("Library");
         QTest::newRow("stale setting") << QString("removed") << QStringList{"de-DE"}
             << QString("de") << QString("Mediathek");
+        QTest::newRow("Polish system") << QString() << QStringList{"pl-PL", "en"}
+            << QString("pl") << QString("Biblioteka");
+        QTest::newRow("Polish override") << QString("pl") << QStringList{"en-US"}
+            << QString("pl") << QString("Biblioteka");
     }
 
     void selection()
@@ -72,6 +77,29 @@ private slots:
         QCOMPARE(QCoreApplication::translate("Aurora::LibraryPage", "%n item(s)", nullptr, 0),
                  QStringLiteral("0 items"));
         QCOMPARE(QCoreApplication::translate("Aurora::Sidebar", "Library"), QStringLiteral("Library"));
+    }
+
+    void polishPlurals_data()
+    {
+        QTest::addColumn<int>("count");
+        QTest::addColumn<QString>("expected");
+        QTest::newRow("zero") << 0 << QStringLiteral("0 elementów");
+        QTest::newRow("one") << 1 << QStringLiteral("1 element");
+        QTest::newRow("two") << 2 << QStringLiteral("2 elementy");
+        QTest::newRow("five") << 5 << QStringLiteral("5 elementów");
+        QTest::newRow("twelve") << 12 << QStringLiteral("12 elementów");
+        QTest::newRow("twenty-one") << 21 << QStringLiteral("21 elementów");
+        QTest::newRow("twenty-two") << 22 << QStringLiteral("22 elementy");
+        QTest::newRow("hundred-twelve") << 112 << QStringLiteral("112 elementów");
+    }
+
+    void polishPlurals()
+    {
+        QFETCH(int, count);
+        QFETCH(QString, expected);
+        Aurora::Localization localization;
+        localization.initialize(QStringLiteral("pl"));
+        QCOMPARE(QCoreApplication::translate("Aurora::LibraryPage", "%n item(s)", nullptr, count), expected);
     }
 };
 

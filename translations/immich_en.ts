@@ -1524,16 +1524,16 @@ to explore people, places, and recent media.</translation>
     </message>
     <message>
         <location line="+157"/>
-        <location line="+1320"/>
+        <location line="+1317"/>
         <source>Loading library…</source>
         <translation>Loading library…</translation>
     </message>
     <message numerus="yes">
-        <location line="-1238"/>
+        <location line="-1235"/>
         <location line="+42"/>
         <location line="+283"/>
         <location line="+158"/>
-        <location line="+788"/>
+        <location line="+785"/>
         <source>%n item(s)</source>
         <translation>
             <numerusform>%n item</numerusform>
@@ -1541,7 +1541,7 @@ to explore people, places, and recent media.</translation>
         </translation>
     </message>
     <message>
-        <location line="-1268"/>
+        <location line="-1265"/>
         <source>Loading library… %1/%2 months</source>
         <translation>Loading library… %1/%2 months</translation>
     </message>
@@ -1706,7 +1706,7 @@ to explore people, places, and recent media.</translation>
         <translation>Copy failed: %1</translation>
     </message>
     <message>
-        <location line="+18"/>
+        <location line="+15"/>
         <location line="+759"/>
         <source>Upload finished: %1 ok, %2 failed</source>
         <translation>Upload finished: %1 ok, %2 failed</translation>
@@ -2917,12 +2917,12 @@ immich desktop  ·  %1</translation>
         <translation>Copied!</translation>
     </message>
     <message>
-        <location filename="../src/ui/pages/LibraryPage.cpp" line="-2427"/>
+        <location filename="../src/ui/pages/LibraryPage.cpp" line="-2424"/>
         <source>Media files (*.jpg *.jpeg *.png *.gif *.webp *.heic *.heif *.tif *.tiff *.bmp *.raw *.dng *.cr2 *.nef *.arw *.mp4 *.mov *.m4v *.avi *.mkv *.webm *.3gp);;All files (*.*)</source>
         <translation>Media files (*.jpg *.jpeg *.png *.gif *.webp *.heic *.heif *.tif *.tiff *.bmp *.raw *.dng *.cr2 *.nef *.arw *.mp4 *.mov *.m4v *.avi *.mkv *.webm *.3gp);;All files (*.*)</translation>
     </message>
     <message>
-        <location filename="../src/main.cpp" line="+70"/>
+        <location filename="../src/main.cpp" line="+74"/>
         <source>Updating translations…</source>
         <translation>Updating translations…</translation>
     </message>
