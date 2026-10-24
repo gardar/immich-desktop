@@ -6,7 +6,7 @@
 #include "core/TlsConfig.h"
 
 #include <QCheckBox>
-#include <QComboBox>
+#include "ui/widgets/NoWheelComboBox.h"
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFormLayout>
@@ -31,7 +31,7 @@ ConnectionPage::ConnectionPage(ImmichClient *client, QWidget *parent)
     , m_apiKey(new QLineEdit(this))
     , m_enableCustomHeaders(new QCheckBox(tr("Enable custom HTTP headers"), this))
     , m_enableClientCert(new QCheckBox(tr("Enable client certificate"), this))
-    , m_certFormat(new QComboBox(this))
+    , m_certFormat(new NoWheelComboBox(this))
     , m_clientCertPath(new QLineEdit(this))
     , m_clientKeyPath(new QLineEdit(this))
     , m_clientKeyLabel(new QLabel(tr("Client key"), this))

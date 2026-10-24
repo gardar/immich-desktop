@@ -107,6 +107,7 @@ set(IMMICH_SOURCES
     src/ui/widgets/ColorButton.h
     src/ui/widgets/MediaTile.cpp
     src/ui/widgets/MediaTile.h
+    src/ui/widgets/NoWheelComboBox.h
     src/ui/widgets/MediaViewerDialog.cpp
     src/ui/widgets/MediaViewerDialog.h
     src/ui/widgets/ShareLinkDialog.cpp

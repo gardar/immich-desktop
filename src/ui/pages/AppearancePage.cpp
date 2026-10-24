@@ -10,7 +10,7 @@
 #include "ui/widgets/VideoHoverPreview.h"
 
 #include <QCheckBox>
-#include <QComboBox>
+#include "ui/widgets/NoWheelComboBox.h"
 #include <QDirIterator>
 #include <QFileInfo>
 #include <QFrame>
@@ -86,7 +86,7 @@ QString formatBytes(qint64 bytes)
 AppearancePage::AppearancePage(ThemeManager *themeManager, QWidget *parent)
     : QWidget(parent)
     , m_themeManager(themeManager)
-    , m_themeCombo(new QComboBox(this))
+    , m_themeCombo(new NoWheelComboBox(this))
     , m_closeToTray(new QCheckBox(tr("Close to system tray"), this))
     , m_autoStart(new QCheckBox(tr("Start immich when I sign in"), this))
     , m_cacheSizeLabel(new QLabel(this))
@@ -117,7 +117,7 @@ AppearancePage::AppearancePage(ThemeManager *themeManager, QWidget *parent)
     auto *languageCard = sectionCard(tr("Language"),
         tr("Language changes apply immediately. Untranslated text appears in English."),
         content, &languageLayout);
-    auto *languageCombo = new QComboBox(languageCard);
+    auto *languageCombo = new NoWheelComboBox(languageCard);
     languageCombo->setObjectName(QStringLiteral("languageCombo"));
     languageCombo->setAccessibleName(tr("Language"));
     languageCombo->addItem(tr("System default"), QString());
@@ -150,7 +150,7 @@ AppearancePage::AppearancePage(ThemeManager *themeManager, QWidget *parent)
         tr("Choose an icon pack and simplify action buttons. Changes are applied immediately and saved automatically."),
         content, &iconsLayout);
     auto *packLabel = new QLabel(tr("Icon pack"), iconsCard);
-    m_iconPackCombo = new QComboBox(iconsCard);
+    m_iconPackCombo = new NoWheelComboBox(iconsCard);
     m_iconPackCombo->setObjectName(QStringLiteral("iconPackCombo"));
     m_iconPackCombo->setAccessibleName(tr("Icon pack"));
     packLabel->setBuddy(m_iconPackCombo);

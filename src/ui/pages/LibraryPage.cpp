@@ -20,7 +20,7 @@
 #include <QButtonGroup>
 #include <QClipboard>
 #include <QCheckBox>
-#include <QComboBox>
+#include "ui/widgets/NoWheelComboBox.h"
 #include <QDateEdit>
 #include <QDateTime>
 #include <QDialog>
@@ -337,11 +337,11 @@ LibraryPage::LibraryPage(ThemeManager *themeManager, ImmichClient *client,
         filters->addWidget(field, 1, column);
         filters->setColumnStretch(column, 1);
     };
-    m_searchScope = new QComboBox(m_searchPanel);
+    m_searchScope = new NoWheelComboBox(m_searchPanel);
     m_searchScope->setObjectName(QStringLiteral("searchScope"));
     m_searchScope->addItems({tr("All assets"), tr("Favorites"), tr("Archive")});
     addFilter(tr("Search in"), m_searchScope, 0);
-    m_searchPerson = new QComboBox(m_searchPanel);
+    m_searchPerson = new NoWheelComboBox(m_searchPanel);
     m_searchPerson->setObjectName(QStringLiteral("searchPerson"));
     m_searchPerson->addItem(tr("All people"), QString());
     m_searchPerson->setMinimumContentsLength(12);
@@ -352,7 +352,7 @@ LibraryPage::LibraryPage(ThemeManager *themeManager, ImmichClient *client,
     m_searchPlace->setPlaceholderText(tr("City"));
     m_searchPlace->setClearButtonEnabled(true);
     addFilter(tr("Places"), m_searchPlace, 2);
-    m_searchMedia = new QComboBox(m_searchPanel);
+    m_searchMedia = new NoWheelComboBox(m_searchPanel);
     m_searchMedia->setObjectName(QStringLiteral("searchMedia"));
     m_searchMedia->addItem(tr("Photos and videos"), QString());
     m_searchMedia->addItem(tr("Photos"), QStringLiteral("IMAGE"));
@@ -388,7 +388,7 @@ LibraryPage::LibraryPage(ThemeManager *themeManager, ImmichClient *client,
     modeTitle->setProperty("searchCaption", true);
     searchLayout->addWidget(modeTitle);
 
-    m_searchMode = new QComboBox(m_searchPanel);
+    m_searchMode = new NoWheelComboBox(m_searchPanel);
     m_searchMode->setObjectName(QStringLiteral("searchMode"));
     m_searchMode->addItem(tr("Context"), QString());
     m_searchMode->addItem(tr("File name"), QStringLiteral("originalFileName"));
