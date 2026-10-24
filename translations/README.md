@@ -8,7 +8,8 @@ The app follows the operating system's preferred UI languages, trying regional
 and script variants before a base language, then falling back to English.
 Automatic mode keeps the system's regional date and number formats. Choose a
 specific language under **Settings → Appearance → Language** to override it.
-Restart the app after changing this setting.
+The interface refreshes immediately after changing this setting; ongoing uploads
+and folder watching continue without restarting the application.
 
 ## Status
 

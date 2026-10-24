@@ -33,7 +33,10 @@ SettingsPage::SettingsPage(ThemeManager *themeManager, UpdateManager *updateMana
 
     m_sections->addWidget(new ConnectionPage(immichClient, m_sections));
     m_sections->addWidget(new SyncFolderPage(folderSync, themeManager, m_sections));
-    m_sections->addWidget(new AppearancePage(themeManager, m_sections));
+    auto *appearance = new AppearancePage(themeManager, m_sections);
+    connect(appearance, &AppearancePage::languageChangeRequested,
+            this, &SettingsPage::languageChangeRequested);
+    m_sections->addWidget(appearance);
     m_sections->addWidget(new UpdatesPage(updateManager, m_sections));
     m_sections->addWidget(new AboutPage(m_sections));
     root->addWidget(m_sections, 1);

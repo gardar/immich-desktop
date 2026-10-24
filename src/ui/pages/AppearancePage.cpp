@@ -115,7 +115,7 @@ AppearancePage::AppearancePage(ThemeManager *themeManager, QWidget *parent)
 
     QVBoxLayout *languageLayout = nullptr;
     auto *languageCard = sectionCard(tr("Language"),
-        tr("Restart the application to apply a language change. Untranslated text appears in English."),
+        tr("Language changes apply immediately. Untranslated text appears in English."),
         content, &languageLayout);
     auto *languageCombo = new QComboBox(languageCard);
     languageCombo->setObjectName(QStringLiteral("languageCombo"));
@@ -128,8 +128,10 @@ AppearancePage::AppearancePage(ThemeManager *themeManager, QWidget *parent)
     languageCombo->setCurrentIndex(qMax(0, languageCombo->findData(AppSettings().loadLanguage())));
     languageLayout->addWidget(languageCombo, 0, Qt::AlignLeft);
     contentRoot->addWidget(languageCard);
-    connect(languageCombo, &QComboBox::currentIndexChanged, this, [languageCombo] {
-        AppSettings().saveLanguage(languageCombo->currentData().toString());
+    connect(languageCombo, &QComboBox::currentIndexChanged, this, [this, languageCombo] {
+        const QString language = languageCombo->currentData().toString();
+        AppSettings().saveLanguage(language);
+        emit languageChangeRequested(language);
     });
 
     QVBoxLayout *presetLayout = nullptr;

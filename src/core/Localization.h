@@ -7,7 +7,7 @@
 namespace Aurora {
 
 // Owns installed translators for the entire application lifetime. Initialize before
-// constructing widgets; language changes in Settings take effect on next launch.
+// constructing widgets, or before rebuilding the UI after a language change.
 class Localization final {
 public:
     void initialize(const QString &language,

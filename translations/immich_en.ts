@@ -204,8 +204,8 @@
     </message>
     <message>
         <location line="-4"/>
-        <source>Restart the application to apply a language change. Untranslated text appears in English.</source>
-        <translation>Restart the application to apply a language change. Untranslated text appears in English.</translation>
+        <source>Language changes apply immediately. Untranslated text appears in English.</source>
+        <translation>Language changes apply immediately. Untranslated text appears in English.</translation>
     </message>
     <message>
         <location line="+5"/>
@@ -213,7 +213,7 @@
         <translation>System default</translation>
     </message>
     <message>
-        <location line="+14"/>
+        <location line="+16"/>
         <source>Theme preset</source>
         <translation>Theme preset</translation>
     </message>
@@ -1978,13 +1978,13 @@ Drop files here, paste with Ctrl+V, or use Upload to add media.</translation>
 <context>
     <name>Aurora::MainWindow</name>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="+232"/>
-        <location line="+215"/>
+        <location filename="../src/ui/MainWindow.cpp" line="+234"/>
+        <location line="+220"/>
         <source>immich</source>
         <translation>immich</translation>
     </message>
     <message>
-        <location line="-212"/>
+        <location line="-217"/>
         <source>Show immich</source>
         <translation>Show immich</translation>
     </message>
@@ -1994,7 +1994,7 @@ Drop files here, paste with Ctrl+V, or use Upload to add media.</translation>
         <translation>Quit</translation>
     </message>
     <message>
-        <location line="+79"/>
+        <location line="+84"/>
         <source>Library</source>
         <translation>Library</translation>
     </message>

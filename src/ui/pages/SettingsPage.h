@@ -20,6 +20,9 @@ public:
 
     bool isShowingUpdates() const;
 
+signals:
+    void languageChangeRequested(const QString &language);
+
 public slots:
     void showConnection();
     void showFolderSync();

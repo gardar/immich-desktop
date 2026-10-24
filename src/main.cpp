@@ -10,6 +10,7 @@
 #include "ui/AppIcon.h"
 #include "ui/FontLoader.h"
 #include "ui/MainWindow.h"
+#include "ui/MainWindowHost.h"
 
 #include <QApplication>
 #include <QFont>
@@ -81,20 +82,21 @@ int main(int argc, char *argv[])
     Aurora::ImmichClient immichClient;
     Aurora::FolderSyncService folderSync(&immichClient);
 
-    Aurora::MainWindow window(&themeManager, &updateManager, &immichClient, &folderSync);
-    QObject::connect(&singleInstance, &Aurora::SingleInstance::activationRequested, &window,
-                     &Aurora::MainWindow::raiseToFront);
+    Aurora::MainWindowHost windows(&localization, &themeManager, &updateManager,
+                                   &immichClient, &folderSync);
+    QObject::connect(&singleInstance, &Aurora::SingleInstance::activationRequested,
+                     &windows, [&windows] { windows.window()->raiseToFront(); });
 
     const bool startHidden =
         launchedFromAutoStart && Aurora::AppSettings().loadWindow().closeToTray &&
         QSystemTrayIcon::isSystemTrayAvailable();
     if (startHidden)
-        window.hide();
+        windows.window()->hide();
     else
-        window.show();
+        windows.window()->show();
 
-    window.scheduleStartupUpdateCheck();
-    window.scheduleGitHubStarPrompt();
+    windows.window()->scheduleStartupUpdateCheck();
+    windows.window()->scheduleGitHubStarPrompt();
 
     return application.exec();
 }

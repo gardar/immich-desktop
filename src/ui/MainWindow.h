@@ -34,6 +34,10 @@ public:
     void raiseToFront();
     void scheduleStartupUpdateCheck();
     void scheduleGitHubStarPrompt();
+    void showAppearanceSettings();
+
+signals:
+    void languageChangeRequested(const QString &language);
 
 protected:
     bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result) override;

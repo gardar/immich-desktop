@@ -160,6 +160,8 @@ MainWindow::MainWindow(ThemeManager *themeManager, UpdateManager *updateManager,
     root->addWidget(body, 1);
 
     connect(m_sidebar, &Sidebar::pageRequested, this, &MainWindow::selectPage);
+    connect(m_settingsPage, &SettingsPage::languageChangeRequested,
+            this, &MainWindow::languageChangeRequested);
     connect(m_topBar, &TopBar::updatesRequested, this, [this] {
         selectPage(5);
     });
@@ -271,6 +273,11 @@ void MainWindow::quitApplication()
 {
     m_forceQuit = true;
     QApplication::quit();
+}
+
+void MainWindow::showAppearanceSettings()
+{
+    selectPage(4);
 }
 
 bool MainWindow::closeToTrayEnabled() const

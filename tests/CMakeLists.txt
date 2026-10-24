@@ -48,3 +48,10 @@ endforeach()
 qt_add_resources(LocalizationTest test_translations PREFIX "/i18n"
     FILES ${IMMICH_QM_FILES} ${IMMICH_QT_QM_FILES})
 add_test(NAME LocalizationTest COMMAND LocalizationTest)
+
+qt_add_executable(LocalizationUiTest LocalizationUiTest.cpp)
+target_link_libraries(LocalizationUiTest PRIVATE immich_app Qt6::Test)
+qt_add_resources(LocalizationUiTest ui_test_translations PREFIX "/i18n"
+    FILES ${IMMICH_QM_FILES} ${IMMICH_QT_QM_FILES})
+add_test(NAME LocalizationUiTest COMMAND LocalizationUiTest)
+set_tests_properties(LocalizationUiTest PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

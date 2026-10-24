@@ -33,7 +33,6 @@ configure_file(
 )
 
 set(IMMICH_SOURCES
-    src/main.cpp
     src/core/AppSettings.cpp
     src/core/AppSettings.h
     src/core/CustomHeaders.cpp
@@ -76,6 +75,8 @@ set(IMMICH_SOURCES
     src/ui/IconUtils.h
     src/ui/MainWindow.cpp
     src/ui/MainWindow.h
+    src/ui/MainWindowHost.cpp
+    src/ui/MainWindowHost.h
     src/ui/pages/AboutPage.cpp
     src/ui/pages/AboutPage.h
     src/ui/pages/AppearancePage.cpp
@@ -145,10 +146,10 @@ if(WIN32)
     list(APPEND IMMICH_SOURCES "${CMAKE_CURRENT_BINARY_DIR}/immich.rc")
 endif()
 
-qt_add_executable(immich
-    WIN32
-    ${IMMICH_SOURCES}
-)
+# Share the actual application UI with the language-switch integration test.
+qt_add_library(immich_app OBJECT ${IMMICH_SOURCES})
+qt_add_executable(immich WIN32 src/main.cpp)
+target_link_libraries(immich PRIVATE immich_app)
 
 # Qt 6.2-compatible Linguist workflow. Catalogs are embedded so installers,
 # AppImages and sandboxed packages use the same translations without extra paths.
@@ -186,11 +187,11 @@ endforeach()
 qt_add_resources(immich translations PREFIX "/i18n"
     FILES ${IMMICH_QM_FILES} ${IMMICH_QT_QM_FILES})
 
-target_include_directories(immich PRIVATE
+target_include_directories(immich_app PUBLIC
     src
     "${CMAKE_CURRENT_BINARY_DIR}/generated"
 )
-target_link_libraries(immich PRIVATE
+target_link_libraries(immich_app PUBLIC
     Qt6::Core
     Qt6::Gui
     Qt6::Multimedia
@@ -201,7 +202,7 @@ target_link_libraries(immich PRIVATE
 )
 
 if(WIN32)
-    target_link_libraries(immich PRIVATE crypt32 dwmapi Psapi)
+    target_link_libraries(immich_app PUBLIC crypt32 dwmapi Psapi)
 
     get_target_property(QT_QMAKE_EXECUTABLE Qt6::qmake IMPORTED_LOCATION)
     get_filename_component(QT_BIN_DIRECTORY "${QT_QMAKE_EXECUTABLE}" DIRECTORY)
@@ -223,7 +224,7 @@ endif()
 
 set_target_properties(immich PROPERTIES OUTPUT_NAME "${IMMICH_EXECUTABLE_NAME}")
 if(NOT IMMICH_ENABLE_UPDATER)
-    target_compile_definitions(immich PRIVATE IMMICH_UPDATER_DISABLED)
+    target_compile_definitions(immich_app PUBLIC IMMICH_UPDATER_DISABLED)
 endif()
 
 include(GNUInstallDirs)

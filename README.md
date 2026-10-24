@@ -157,7 +157,7 @@ Ways to help right now: bug fixes, UX polish, Immich API coverage (albums, shari
 ## Translations
 
 The interface supports Qt translation catalogs and follows your system language.
-Choose **Settings → Appearance → Language** to override it, then restart the app.
+Choose **Settings → Appearance → Language** to override it; the interface refreshes immediately.
 Unfinished strings fall back to English. See [the translation guide](translations/README.md)
 to help translate or add a language.
 

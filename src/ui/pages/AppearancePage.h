@@ -17,6 +17,9 @@ class AppearancePage final : public QWidget {
 public:
     explicit AppearancePage(ThemeManager *themeManager, QWidget *parent = nullptr);
 
+signals:
+    void languageChangeRequested(const QString &language);
+
 protected:
     void showEvent(QShowEvent *event) override;
 
