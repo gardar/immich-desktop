@@ -20,6 +20,8 @@ target_link_libraries(TlsConfigTest PRIVATE
 )
 
 add_test(NAME TlsConfigTest COMMAND TlsConfigTest)
+# QTEST_MAIN builds a QGuiApplication (links Qt Gui); headless CI has no xcb display.
+set_tests_properties(TlsConfigTest PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 qt_add_executable(CustomHeadersTest
     CustomHeadersTest.cpp
