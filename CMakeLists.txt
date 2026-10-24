@@ -148,8 +148,9 @@ if(WIN32)
     list(APPEND IMMICH_SOURCES "${CMAKE_CURRENT_BINARY_DIR}/immich.rc")
 endif()
 
-# Share the actual application UI with the language-switch integration test.
-qt_add_library(immich_app OBJECT ${IMMICH_SOURCES})
+# Share the application UI with LocalizationUiTest. STATIC (not OBJECT): MSVC
+# + AUTORCC fails to link dependents against qrc_*.obj from OBJECT libraries.
+qt_add_library(immich_app STATIC ${IMMICH_SOURCES})
 qt_add_executable(immich WIN32 src/main.cpp)
 target_link_libraries(immich PRIVATE immich_app)
 
