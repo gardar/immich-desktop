@@ -2,8 +2,10 @@
 
 #include "ui/FolderPaths.h"
 
+#include <QEasingCurve>
 #include <QHeaderView>
 #include <QPainter>
+#include <QPropertyAnimation>
 #include <QTreeWidgetItemIterator>
 
 namespace Aurora {
@@ -24,6 +26,7 @@ const QString kRetry = QStringLiteral("retry");
 BrowseTree::BrowseTree(BrowseSection section, QWidget *parent)
     : QTreeWidget(parent)
     , m_section(section)
+    , m_heightAnimation(new QPropertyAnimation(this, "maximumHeight", this))
 {
     setObjectName(QStringLiteral("browseTree"));
     setHeaderHidden(true);
@@ -40,7 +43,24 @@ BrowseTree::BrowseTree(BrowseSection section, QWidget *parent)
     setFocusPolicy(Qt::NoFocus);
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
     header()->setStretchLastSection(true);
+    setMinimumHeight(0);
+    setMaximumHeight(0);
+    setFixedHeight(0);
+    hide();
     addNote(tr("Loading…"));
+
+    m_heightAnimation->setDuration(160);
+    m_heightAnimation->setEasingCurve(QEasingCurve::OutCubic);
+    connect(m_heightAnimation, &QPropertyAnimation::finished, this, [this] {
+        if (m_open) {
+            setMaximumHeight(QWIDGETSIZE_MAX);
+            setFixedHeight(contentHeight());
+        } else {
+            hide();
+            setFixedHeight(0);
+            setMaximumHeight(0);
+        }
+    });
 
     connect(this, &QTreeWidget::itemClicked, this,
             [this](QTreeWidgetItem *item) { activate(item); });
@@ -227,9 +247,66 @@ void BrowseTree::activate(QTreeWidgetItem *item)
     }
 }
 
+int BrowseTree::contentHeight() const
+{
+    return sizeHint().height();
+}
+
+bool BrowseTree::isOpen() const
+{
+    return m_open;
+}
+
+void BrowseTree::setOpen(bool open, bool animate)
+{
+    if (m_open == open &&
+        ((open && isVisible() && m_heightAnimation->state() != QAbstractAnimation::Running) ||
+         (!open && !isVisible())))
+        return;
+    m_open = open;
+    applyOpenState(animate);
+}
+
+void BrowseTree::applyOpenState(bool animate)
+{
+    m_heightAnimation->stop();
+    const int target = m_open ? contentHeight() : 0;
+    const int current = isVisible() ? height() : 0;
+
+    if (!animate) {
+        if (m_open) {
+            setMaximumHeight(QWIDGETSIZE_MAX);
+            setFixedHeight(target);
+            show();
+        } else {
+            hide();
+            setFixedHeight(0);
+            setMaximumHeight(0);
+        }
+        return;
+    }
+
+    // Let maximumHeight clip the list; unlock any previous fixed height first.
+    setMinimumHeight(0);
+    setMaximumHeight(current);
+    if (m_open)
+        show();
+
+    m_heightAnimation->setStartValue(current);
+    m_heightAnimation->setEndValue(target);
+    m_heightAnimation->start();
+}
+
 void BrowseTree::updateHeight()
 {
-    setFixedHeight(sizeHint().height());
+    if (!m_open)
+        return;
+    if (m_heightAnimation->state() == QAbstractAnimation::Running) {
+        m_heightAnimation->setEndValue(contentHeight());
+        return;
+    }
+    setMaximumHeight(QWIDGETSIZE_MAX);
+    setFixedHeight(contentHeight());
 }
 
 void BrowseTree::drawBranches(QPainter *painter, const QRect &rect,

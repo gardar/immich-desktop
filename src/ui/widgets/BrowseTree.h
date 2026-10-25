@@ -6,6 +6,8 @@
 #include <QHash>
 #include <QTreeWidget>
 
+class QPropertyAnimation;
+
 namespace Aurora {
 
 // The albums, tags or folders listed under their sidebar button. It grows to fit
@@ -25,6 +27,9 @@ public:
     void selectValue(const QString &value);
     QRect selectedRect() const; // In viewport coordinates.
     QSize sizeHint() const override;
+    // Reveal or hide the list under its sidebar button (height animation when animate).
+    void setOpen(bool open, bool animate = true);
+    bool isOpen() const;
 
 signals:
     void albumRequested(const Aurora::ImmichAlbum &album);
@@ -42,11 +47,15 @@ private:
     QTreeWidgetItem *addNote(const QString &text);
     void activate(QTreeWidgetItem *item);
     void updateHeight();
+    void applyOpenState(bool animate);
+    int contentHeight() const;
 
     BrowseSection m_section;
     QHash<QString, ImmichAlbum> m_albums;
     QHash<QString, ImmichTag> m_tags;
     QString m_selectedValue; // Reapplied when the list reloads.
+    bool m_open = false;
+    QPropertyAnimation *m_heightAnimation = nullptr;
 };
 
 } // namespace Aurora

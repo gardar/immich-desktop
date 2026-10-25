@@ -120,8 +120,12 @@ bool Sidebar::isSectionExpanded(BrowseSection section) const
 void Sidebar::updateTreeVisibility()
 {
     const bool collapsed = m_themeManager->minimalistUi() || isCollapsed();
-    for (auto it = m_trees.cbegin(); it != m_trees.cend(); ++it)
-        it.value()->setVisible(!m_settingsMode && !collapsed && m_treeExpanded.value(it.key()));
+    const bool allowOpen = !m_settingsMode && !collapsed;
+    for (auto it = m_trees.cbegin(); it != m_trees.cend(); ++it) {
+        const bool wantOpen = allowOpen && m_treeExpanded.value(it.key());
+        // Animate chevron toggles; snap shut when the rail collapses or settings open.
+        it.value()->setOpen(wantOpen, allowOpen && isVisible());
+    }
 }
 
 void Sidebar::toggleCollapsed()
