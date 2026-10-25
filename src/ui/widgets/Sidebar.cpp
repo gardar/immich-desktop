@@ -94,6 +94,8 @@ Sidebar::Sidebar(ThemeManager *themeManager, QWidget *parent)
     m_version->setProperty("subheading", true);
     m_version->setAlignment(Qt::AlignCenter);
     m_version->setWordWrap(true);
+    // Small gap under Collapse so the version footer does not sit flush against the button.
+    m_version->setContentsMargins(0, 5, 0, 0);
     layout->addWidget(m_version);
 
     m_widthAnimation->setDuration(160);
