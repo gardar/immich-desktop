@@ -230,6 +230,12 @@ for day-to-day use. Beta builds can break.
 | Snap (`beta`) | `sudo snap install immich-desktop --beta` |
 | Snap (`edge`) | `sudo snap install immich-desktop --edge` |
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Please follow the
+[Code of Conduct](CODE_OF_CONDUCT.md). Security reports go through
+[SECURITY.md](SECURITY.md), not public issues.
+
 ## License
 
 MIT - see [LICENSE.txt](LICENSE.txt).

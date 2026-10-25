@@ -1,0 +1,83 @@
+name: Bug report
+description: Something is broken or behaves unexpectedly
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. This is an **unofficial** Immich desktop client.
+        Search existing issues first. For security problems, use a [private advisory](https://github.com/hdmain/immich-desktop/security/advisories/new).
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What went wrong?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps someone else can follow.
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: input
+    id: app_version
+    attributes:
+      label: Immich Desktop version
+      description: Stable release tag, or beta / commit if applicable.
+      placeholder: e.g. v0.2.3 or beta
+    validations:
+      required: true
+
+  - type: input
+    id: server_version
+    attributes:
+      label: Immich server version
+      placeholder: e.g. v1.135.3
+    validations:
+      required: false
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - Linux (Snap)
+        - Linux (deb / AppImage / other)
+        - Arch (AUR)
+        - macOS
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots
+      description: Redact URLs, tokens, and personal photo paths.
+    validations:
+      required: false

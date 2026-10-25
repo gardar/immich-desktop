@@ -1,0 +1,51 @@
+name: Feature request
+description: Suggest an improvement or new capability
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the problem and a concrete idea. This client is unofficial and
+        cannot change Immich server APIs — prefer features that fit the existing API.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do that is hard or impossible today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: How should it work in the desktop app?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds or other approaches you thought about.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Library / timeline
+        - Explore
+        - Sidebar / navigation
+        - Viewer / info panel
+        - Upload / Folder Sync
+        - Settings / appearance
+        - Packaging / installers
+        - Translations
+        - Other
+    validations:
+      required: true
