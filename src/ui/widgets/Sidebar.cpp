@@ -10,6 +10,7 @@
 #include <QEasingCurve>
 #include <QLabel>
 #include <QScrollArea>
+#include <QStyle>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QVariantAnimation>
@@ -161,6 +162,14 @@ void Sidebar::refreshLayout(bool animate)
         if (label->objectName() == QStringLiteral("sidebarGroupLabel"))
             label->setVisible(!collapsed);
     }
+    // Guide lines sit under group headers; flatten them in the icon-only rail.
+    for (QWidget *group : findChildren<QWidget *>(QStringLiteral("sidebarNavGroup"))) {
+        group->setProperty("flat", collapsed);
+        if (auto *groupLayout = qobject_cast<QVBoxLayout *>(group->layout()))
+            groupLayout->setContentsMargins(collapsed ? 0 : 8, 0, 0, collapsed ? 0 : 2);
+        group->style()->unpolish(group);
+        group->style()->polish(group);
+    }
     m_version->setVisible(!collapsed);
     m_toggleButton->setVisible(!minimal);
     m_toggleButton->setText(collapsed ? tr("Expand") : tr("Collapse"));
@@ -229,7 +238,7 @@ AnimatedButton *Sidebar::addNavigation(const QString &label, const QString &icon
     button->setIconOnly(m_themeManager->minimalistUi() || isCollapsed());
     if (checkable)
         m_navigationGroup->addButton(button, index);
-    m_navigationLayout->addWidget(button);
+    navTarget()->addWidget(button);
     if (index < kSectionIdBase) {
         connect(button, &QPushButton::clicked, this, [this, index] {
             emit pageRequested(index);
@@ -258,7 +267,7 @@ void Sidebar::addSectionNavigation(BrowseSection section, const QString &label,
         if (expanded)
             emit sectionExpanded(section);
     });
-    m_navigationLayout->addWidget(tree);
+    navTarget()->addWidget(tree);
 }
 
 void Sidebar::addGroupLabel(const QString &text)
@@ -271,6 +280,25 @@ void Sidebar::addGroupLabel(const QString &text)
     label->setContentsMargins(8, top, 0, 1);
     label->setVisible(!(m_themeManager->minimalistUi() || isCollapsed()));
     m_navigationLayout->addWidget(label);
+    beginNavGroup();
+}
+
+void Sidebar::beginNavGroup()
+{
+    auto *group = new QWidget(this);
+    group->setObjectName(QStringLiteral("sidebarNavGroup"));
+    const bool collapsed = m_themeManager->minimalistUi() || isCollapsed();
+    group->setProperty("flat", collapsed);
+    auto *layout = new QVBoxLayout(group);
+    layout->setContentsMargins(collapsed ? 0 : 8, 0, 0, collapsed ? 0 : 2);
+    layout->setSpacing(3);
+    m_currentGroupLayout = layout;
+    m_navigationLayout->addWidget(group);
+}
+
+QVBoxLayout *Sidebar::navTarget() const
+{
+    return m_currentGroupLayout ? m_currentGroupLayout : m_navigationLayout;
 }
 
 void Sidebar::clearNavigation()
@@ -281,13 +309,18 @@ void Sidebar::clearNavigation()
     }
     m_navigationGroup = new QButtonGroup(this);
     m_navigationGroup->setExclusive(true);
+    m_currentGroupLayout = nullptr;
+
+    // Reparent trees before deleting group wrappers so lists survive rebuilds.
+    for (BrowseTree *tree : m_trees) {
+        tree->hide();
+        tree->setParent(this);
+    }
 
     while (auto *item = m_navigationLayout->takeAt(0)) {
         if (auto *widget = item->widget()) {
             widget->hide();
-            // Trees keep their loaded albums, tags and folders between rebuilds.
-            if (!qobject_cast<BrowseTree *>(widget))
-                widget->deleteLater();
+            widget->deleteLater();
         }
         delete item;
     }
@@ -340,6 +373,7 @@ void Sidebar::showSettingsNavigation()
     m_navigationLabel->setText(tr("SETTINGS"));
     m_navigationLabel->setVisible(!(m_themeManager->minimalistUi() || isCollapsed()));
     clearNavigation();
+    // Settings pages are a flat list — no group guide lines.
     addNavigation(tr("Immich Server"),
                   QStringLiteral(":/icons/server.svg"), 2);
     addNavigation(tr("Folder Sync"),

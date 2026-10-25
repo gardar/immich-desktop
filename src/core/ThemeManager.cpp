@@ -165,6 +165,16 @@ QString ThemeManager::buildStyleSheet() const
             letter-spacing: 0.06em;
             text-transform: uppercase;
         }
+        QWidget#sidebarNavGroup {
+            background: transparent;
+            border: none;
+            border-left: 1px solid %4;
+            margin-left: 10px;
+        }
+        QWidget#sidebarNavGroup[flat="true"] {
+            border-left: none;
+            margin-left: 0;
+        }
         QLabel[section="true"] { font-size: 12pt; font-weight: 600; }
         QPushButton {
             background: %6;
