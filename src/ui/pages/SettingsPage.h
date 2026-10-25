@@ -22,6 +22,7 @@ public:
 
 signals:
     void languageChangeRequested(const QString &language);
+    void backRequested();
 
 public slots:
     void showConnection();

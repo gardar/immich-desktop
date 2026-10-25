@@ -6,9 +6,14 @@
 #include "ui/pages/ConnectionPage.h"
 #include "ui/pages/SyncFolderPage.h"
 #include "ui/pages/UpdatesPage.h"
+#include "ui/IconUtils.h"
 #include "ui/widgets/AnimatedStackedWidget.h"
 
+#include <QHBoxLayout>
+#include <QKeySequence>
 #include <QLabel>
+#include <QPushButton>
+#include <QShortcut>
 #include <QVBoxLayout>
 
 namespace Aurora {
@@ -23,13 +28,29 @@ SettingsPage::SettingsPage(ThemeManager *themeManager, UpdateManager *updateMana
     root->setContentsMargins(4, 6, 4, 4);
     root->setSpacing(8);
 
+    auto *headerRow = new QHBoxLayout;
+    headerRow->setSpacing(14);
+    auto *backButton = new QPushButton(tr("Back"), this);
+    configureActionButton(backButton, QStringLiteral(":/icons/arrow-left.svg"));
+    backButton->setCursor(Qt::PointingHandCursor);
+    backButton->setToolTip(tr("Back (Esc)"));
+    connect(backButton, &QPushButton::clicked, this, &SettingsPage::backRequested);
+    auto *escape = new QShortcut(QKeySequence(Qt::Key_Escape), this);
+    escape->setContext(Qt::WidgetWithChildrenShortcut);
+    connect(escape, &QShortcut::activated, this, &SettingsPage::backRequested);
+
+    auto *titles = new QVBoxLayout;
+    titles->setSpacing(2);
     auto *heading = new QLabel(tr("Settings"), this);
     heading->setProperty("heading", true);
     auto *subheading = new QLabel(
         tr("Choose a settings section from the sidebar."), this);
     subheading->setProperty("subheading", true);
-    root->addWidget(heading);
-    root->addWidget(subheading);
+    titles->addWidget(heading);
+    titles->addWidget(subheading);
+    headerRow->addWidget(backButton, 0, Qt::AlignVCenter);
+    headerRow->addLayout(titles, 1);
+    root->addLayout(headerRow);
 
     m_sections->addWidget(new ConnectionPage(immichClient, m_sections));
     m_sections->addWidget(new SyncFolderPage(folderSync, themeManager, m_sections));

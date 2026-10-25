@@ -79,6 +79,7 @@ private:
     bool m_sslPasswordPromptOpen = false;
     int m_sslPasswordAttempts = 0;
     int m_pageIndex = 0;
+    int m_lastMainPage = 0; // Library or Explore, where Settings' Back returns to.
 };
 
 } // namespace Aurora
