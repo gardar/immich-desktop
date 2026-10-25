@@ -18,7 +18,7 @@ Please **do not** open a public GitHub issue for security vulnerabilities.
 
 Prefer one of these private channels:
 
-1. **GitHub Security Advisories** — [Report a vulnerability](https://github.com/hdmain/immich-desktop/security/advisories/new)
+1. **GitHub Security Advisories** - [Report a vulnerability](https://github.com/hdmain/immich-desktop/security/advisories/new)
 2. Contact the maintainer privately: [@hdmain](https://github.com/hdmain)
 
 Include as much detail as you can:

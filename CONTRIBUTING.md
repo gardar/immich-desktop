@@ -7,11 +7,11 @@ By participating, you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Ways to contribute
 
-- **Bugs and UX issues** — open a [bug report](https://github.com/hdmain/immich-desktop/issues/new/choose)
-- **Ideas** — open a [feature request](https://github.com/hdmain/immich-desktop/issues/new/choose)
-- **Code** — fix issues or polish the UI (Qt Widgets / CMake)
-- **Translations** — see [translations/README.md](translations/README.md)
-- **Security** — report privately via [SECURITY.md](SECURITY.md); do not open a public issue for vulnerabilities
+- **Bugs and UX issues** - open a [bug report](https://github.com/hdmain/immich-desktop/issues/new/choose)
+- **Ideas** - open a [feature request](https://github.com/hdmain/immich-desktop/issues/new/choose)
+- **Code** - fix issues or polish the UI (Qt Widgets / CMake)
+- **Translations** - see [translations/README.md](translations/README.md)
+- **Security** - report privately via [SECURITY.md](SECURITY.md); do not open a public issue for vulnerabilities
 
 ## Development setup
 
@@ -26,7 +26,7 @@ cmake --build build
 
 Useful targets and notes:
 
-- `update_translations` — refresh `.ts` catalogs and the README language table
+- `update_translations` - refresh `.ts` catalogs and the README language table
 - Keep changes focused; match existing style in `src/core` and `src/ui`
 - Update `changelog.json` for user-facing changes (same version as `CMakeLists.txt`)
 

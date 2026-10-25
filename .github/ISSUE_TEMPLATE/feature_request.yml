@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         Describe the problem and a concrete idea. This client is unofficial and
-        cannot change Immich server APIs — prefer features that fit the existing API.
+        cannot change Immich server APIs; prefer features that fit the existing API.
 
   - type: textarea
     id: problem
