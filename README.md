@@ -163,19 +163,20 @@ Choose **Settings → Appearance → Language** to override it; the interface re
 The app automatically downloads current translations from GitHub at startup and
 when selecting a language. A saved copy and embedded catalogs provide offline fallback,
 so translation updates do not require a new app build.
-Polish and Simplified Chinese cover all application messages; Polish includes
-its three plural forms. Unfinished strings fall back to English. See [the
-translation guide](translations/README.md) to help translate or add a language.
+English is complete. Polish and Simplified Chinese cover most of the UI (new
+library-section strings still need translating); unfinished text falls back to
+English. See [the translation guide](translations/README.md) to help translate
+or add a language.
 
 <!-- translation-status:start -->
 
 | Language | Code | Progress | Strings |
 | --- | --- | --- | ---: |
-| English | `en` | `██████████` 100% | 547 / 547 |
-| German (Deutsch) | `de` | `███░░░░░░░` 29% | 161 / 547 |
-| French (Français) | `fr` | `███░░░░░░░` 29% | 161 / 547 |
-| Polish (Polski) | `pl` | `██████████` 100% | 547 / 547 |
-| Chinese (简体) | `zh_CN` | `██████████` 100% | 547 / 547 |
+| English | `en` | `██████████` 100% | 597 / 597 |
+| German (Deutsch) | `de` | `███░░░░░░░` 27% | 160 / 597 |
+| French (Français) | `fr` | `███░░░░░░░` 27% | 160 / 597 |
+| Polish (Polski) | `pl` | `█████████░` 91% | 543 / 597 |
+| Chinese (简体) | `zh_CN` | `█████████░` 91% | 543 / 597 |
 
 _Auto-generated from `translations/immich_*.ts`. Run `python tools/update_translation_status.py` or `cmake --build build --target update_translations`._
 

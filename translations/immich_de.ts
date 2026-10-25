@@ -294,27 +294,42 @@
         <translation>Die Auswahl einer Farbe aktiviert automatisch das benutzerdefinierte Farbschema.</translation>
     </message>
     <message>
-        <location line="+4"/>
+        <location line="+5"/>
         <source>Background</source>
         <translation>Hintergrund</translation>
     </message>
     <message>
-        <location line="+2"/>
+        <location line="+0"/>
         <source>Panels</source>
         <translation>Bereiche</translation>
     </message>
     <message>
-        <location line="+2"/>
+        <location line="+1"/>
         <source>Buttons</source>
         <translation>Schaltflächen</translation>
     </message>
     <message>
-        <location line="+2"/>
+        <location line="+0"/>
+        <source>Borders</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Text</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Muted text</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
         <source>Accent</source>
         <translation>Akzentfarbe</translation>
     </message>
     <message>
-        <location line="+5"/>
+        <location line="+9"/>
         <source>Reset custom colors</source>
         <translation>Eigene Farben zurücksetzen</translation>
     </message>
@@ -427,7 +442,7 @@
 <context>
     <name>Aurora::AssetInfoPanel</name>
     <message>
-        <location filename="../src/ui/widgets/AssetInfoPanel.cpp" line="+53"/>
+        <location filename="../src/ui/widgets/AssetInfoPanel.cpp" line="+55"/>
         <source>Info</source>
         <translation>Informationen</translation>
     </message>
@@ -458,7 +473,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+25"/>
+        <location line="+26"/>
         <source>Show photos from this day</source>
         <translation type="unfinished"></translation>
     </message>
@@ -549,9 +564,14 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+1"/>
+        <location line="+6"/>
         <source>Albums</source>
         <translation>Alben</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>Show photos tagged %1</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+6"/>
@@ -559,25 +579,77 @@
         <translation>Schlagwörter</translation>
     </message>
     <message>
-        <location line="+1"/>
+        <location line="+46"/>
+        <source>Show the album %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-47"/>
         <source>No tags</source>
         <translation>Keine Schlagwörter</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="+10"/>
+        <source>Show the photos in this folder</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
         <source>Folder</source>
         <translation>Ordner</translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="+28"/>
         <source>Not in any album</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>Aurora::BrowseTree</name>
+    <message>
+        <location filename="../src/ui/widgets/BrowseTree.cpp" line="+39"/>
+        <location line="+112"/>
+        <source>Loading…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-94"/>
+        <source>No albums</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <location line="+5"/>
+        <source>%1 · %n item(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>No tags</source>
+        <translation type="unfinished">Keine Schlagwörter</translation>
+    </message>
+    <message>
+        <location line="+25"/>
+        <source>No folders</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+42"/>
+        <source>Needs the %1 permission · click to retry</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Couldn&apos;t be loaded · click to retry</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
 <context>
     <name>Aurora::ColorButton</name>
     <message>
-        <location filename="../src/ui/widgets/ColorButton.cpp" line="+56"/>
+        <location filename="../src/ui/widgets/ColorButton.cpp" line="+59"/>
         <source>Choose %1 color</source>
         <translation type="unfinished"></translation>
     </message>
@@ -616,11 +688,11 @@
     </message>
     <message>
         <location line="+3"/>
-        <source>Connect this desktop client to your Immich instance. The API key needs user.read, asset.read, asset.view, asset.upload, asset.download, asset.delete, and person.read permissions; album.read is optional and lists a photo&apos;s albums. An optional local URL is preferred automatically when reachable.</source>
+        <source>Connect this desktop client to your Immich instance. The API key needs user.read, asset.read, asset.view, asset.upload, asset.download, asset.delete, and person.read permissions; album.read, tag.read and folder.read are optional and enable the Albums, Tags and Folders sections (album.read also lists a photo&apos;s albums). An optional local URL is preferred automatically when reachable.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+15"/>
+        <location line="+16"/>
         <source>Optional - e.g. http://192.168.1.10:2283</source>
         <translation type="unfinished"></translation>
     </message>
@@ -854,12 +926,13 @@
 <context>
     <name>Aurora::ExplorePage</name>
     <message>
-        <location filename="../src/ui/pages/ExplorePage.cpp" line="+145"/>
+        <location filename="../src/ui/pages/ExplorePage.cpp" line="+187"/>
+        <location line="+691"/>
         <source>Explore</source>
         <translation>Entdecken</translation>
     </message>
     <message>
-        <location line="+2"/>
+        <location line="-689"/>
         <source>People, places, and recent media</source>
         <translation type="unfinished"></translation>
     </message>
@@ -867,16 +940,19 @@
         <location line="+5"/>
         <location line="+3"/>
         <location line="+1"/>
+        <location line="+175"/>
         <source>Refresh</source>
         <translation>Aktualisieren</translation>
     </message>
     <message>
-        <location line="+36"/>
+        <location line="-139"/>
+        <location line="+620"/>
+        <location line="+182"/>
         <source>People</source>
         <translation>Personen</translation>
     </message>
     <message>
-        <location line="+1"/>
+        <location line="-801"/>
         <source>Places</source>
         <translation>Orte</translation>
     </message>
@@ -886,28 +962,50 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+26"/>
-        <source>Explore</source>
+        <location line="+51"/>
+        <location line="+10"/>
+        <source>Restore all</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+50"/>
-        <location line="+738"/>
+        <location line="-8"/>
+        <location line="+14"/>
+        <source>Empty trash</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-5"/>
+        <source>Restore everything in the trash to your library?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Permanently delete everything in the trash? This can&apos;t be undone.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+32"/>
+        <location line="+1199"/>
         <source>Load more</source>
         <translation>Mehr laden</translation>
     </message>
     <message>
-        <location line="-575"/>
+        <location line="-1045"/>
+        <source>This folder couldn&apos;t be loaded.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+153"/>
         <source>Loading explore…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+5"/>
+        <location line="+4"/>
         <source>Explore could not be refreshed right now.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+48"/>
+        <location line="+49"/>
         <source>Unknown</source>
         <translation type="unfinished"></translation>
     </message>
@@ -922,7 +1020,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+69"/>
+        <location line="+73"/>
         <source>Load explore</source>
         <translation type="unfinished"></translation>
     </message>
@@ -960,12 +1058,151 @@ to explore people, places, and recent media.</source>
     </message>
     <message>
         <location line="+5"/>
-        <location line="+21"/>
+        <location line="+24"/>
+        <location line="+116"/>
         <source>Loading photos…</source>
         <translation>Fotos werden geladen…</translation>
     </message>
     <message>
-        <location line="+106"/>
+        <location line="-102"/>
+        <location line="+131"/>
+        <source>Albums</source>
+        <translation type="unfinished">Alben</translation>
+    </message>
+    <message>
+        <location line="-107"/>
+        <location line="+152"/>
+        <source>Tags</source>
+        <translation type="unfinished">Schlagwörter</translation>
+    </message>
+    <message>
+        <location line="-127"/>
+        <location line="+138"/>
+        <source>Folders</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-110"/>
+        <source>Favorites</source>
+        <translation type="unfinished">Favoriten</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Archive</source>
+        <translation type="unfinished">Archiv</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>Trash</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+48"/>
+        <source>No albums yet</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <location line="+1"/>
+        <source>%n album(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location line="+3"/>
+        <source>%1
+%n item(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message>
+        <location line="+21"/>
+        <source>Unnamed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>%1 (hidden)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>No people recognized yet</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <location line="+1"/>
+        <source>%n person(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Hide hidden</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Show hidden (%1)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Hide people marked hidden in Immich</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Show people marked hidden in Immich</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>No tags yet</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <location line="+0"/>
+        <source>%n tag(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>No folders</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <location line="+1"/>
+        <source>%n folder(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message>
+        <location line="+111"/>
+        <location line="+14"/>
+        <source>Trash is empty</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <location line="-8"/>
+        <source> · deleted permanently after %n day(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message>
+        <location line="+87"/>
         <source>Unknown date</source>
         <translation>Unbekanntes Datum</translation>
     </message>
@@ -985,12 +1222,13 @@ to explore people, places, and recent media.</source>
         <translation>Fotos</translation>
     </message>
     <message>
-        <location line="+14"/>
+        <location line="-117"/>
+        <location line="+131"/>
         <source>Nothing here yet</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location line="+7"/>
+        <location line="-128"/>
         <source>%n item(s)</source>
         <translation>
             <numerusform>%n Element</numerusform>
@@ -998,7 +1236,8 @@ to explore people, places, and recent media.</source>
         </translation>
     </message>
     <message>
-        <location line="+210"/>
+        <location line="-109"/>
+        <location line="+461"/>
         <source>Loading…</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1070,7 +1309,7 @@ to explore people, places, and recent media.</source>
 <context>
     <name>Aurora::ImmichClient</name>
     <message>
-        <location filename="../src/core/ImmichClient.cpp" line="+434"/>
+        <location filename="../src/core/ImmichClient.cpp" line="+440"/>
         <source>Connection</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1092,16 +1331,16 @@ to explore people, places, and recent media.</source>
     </message>
     <message>
         <location line="+0"/>
-        <location line="+912"/>
+        <location line="+1067"/>
         <location line="+85"/>
         <location line="+24"/>
-        <location line="+71"/>
-        <location line="+192"/>
+        <location line="+76"/>
+        <location line="+252"/>
         <source>The asset identifier is invalid.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-1253"/>
+        <location line="-1473"/>
         <source>Set the Immich server URL and API key in Settings first.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1188,26 +1427,26 @@ to explore people, places, and recent media.</source>
         <location line="+8"/>
         <location line="+115"/>
         <location line="+10"/>
-        <location line="+29"/>
-        <location line="+27"/>
+        <location line="+173"/>
+        <location line="+38"/>
         <source>Load explore</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-180"/>
+        <location line="-335"/>
         <source>You are offline and no cached explore data is available.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+193"/>
+        <location line="+348"/>
         <location line="+89"/>
-        <location line="+682"/>
+        <location line="+747"/>
         <location line="+32"/>
         <source>Load image</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-799"/>
+        <location line="-864"/>
         <source>The person identifier is invalid.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1218,12 +1457,12 @@ to explore people, places, and recent media.</source>
     </message>
     <message>
         <location line="+24"/>
-        <location line="+781"/>
+        <location line="+846"/>
         <source>Unsupported image format.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-682"/>
+        <location line="-747"/>
         <location line="+99"/>
         <location line="+9"/>
         <location line="+16"/>
@@ -1281,7 +1520,7 @@ to explore people, places, and recent media.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+108"/>
+        <location line="+113"/>
         <location line="+3"/>
         <location line="+39"/>
         <location line="+10"/>
@@ -1296,7 +1535,13 @@ to explore people, places, and recent media.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+23"/>
+        <location line="+47"/>
+        <location line="+9"/>
+        <source>Trash</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+27"/>
         <location line="+12"/>
         <location line="+21"/>
         <source>Delete</source>
@@ -1332,23 +1577,24 @@ to explore people, places, and recent media.</source>
     <name>Aurora::LibraryPage</name>
     <message>
         <location filename="../src/ui/pages/LibraryPage.cpp" line="+112"/>
-        <location line="+1595"/>
+        <location line="+1603"/>
         <source>Upload</source>
         <translation>Hochladen</translation>
     </message>
     <message>
-        <location line="-1594"/>
+        <location line="-1602"/>
         <source>Refresh</source>
         <translation>Aktualisieren</translation>
     </message>
     <message>
         <location line="+1"/>
         <location line="+149"/>
+        <location line="+29"/>
         <source>Years</source>
         <translation>Jahre</translation>
     </message>
     <message>
-        <location line="-112"/>
+        <location line="-141"/>
         <source>Photos &amp; videos</source>
         <translation>Fotos und Videos</translation>
     </message>
@@ -1376,15 +1622,10 @@ to explore people, places, and recent media.</source>
     <message>
         <location line="+19"/>
         <source>Library</source>
-        <translation type="unfinished"></translation>
+        <translation type="unfinished">Mediathek</translation>
     </message>
     <message>
-        <location line="+32"/>
-        <source>Years</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+23"/>
+        <location line="+55"/>
         <source>Refine your search</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1520,7 +1761,7 @@ to explore people, places, and recent media.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+157"/>
+        <location line="+165"/>
         <location line="+1317"/>
         <source>Loading library…</source>
         <translation>Mediathek wird geladen…</translation>
@@ -1704,12 +1945,12 @@ to explore people, places, and recent media.</source>
     </message>
     <message>
         <location line="+15"/>
-        <location line="+759"/>
+        <location line="+762"/>
         <source>Upload finished: %1 ok, %2 failed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-751"/>
+        <location line="-754"/>
         <source>%1 (%2 left)</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1784,7 +2025,7 @@ Drop files here, paste with Ctrl+V, or use Upload to add media.</source>
         </translation>
     </message>
     <message>
-        <location line="+70"/>
+        <location line="+73"/>
         <source>Preparing download…</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1971,13 +2212,13 @@ Drop files here, paste with Ctrl+V, or use Upload to add media.</source>
 <context>
     <name>Aurora::MainWindow</name>
     <message>
-        <location filename="../src/ui/MainWindow.cpp" line="+234"/>
-        <location line="+222"/>
+        <location filename="../src/ui/MainWindow.cpp" line="+356"/>
+        <location line="+224"/>
         <source>immich</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-219"/>
+        <location line="-221"/>
         <source>Show immich</source>
         <translation>immich anzeigen</translation>
     </message>
@@ -1987,12 +2228,13 @@ Drop files here, paste with Ctrl+V, or use Upload to add media.</source>
         <translation>Beenden</translation>
     </message>
     <message>
-        <location line="+86"/>
+        <location line="+88"/>
         <source>Library</source>
         <translation>Mediathek</translation>
     </message>
     <message>
-        <location line="+3"/>
+        <location line="-303"/>
+        <location line="+306"/>
         <source>Explore</source>
         <translation>Entdecken</translation>
     </message>
@@ -2102,7 +2344,7 @@ Drop files here, paste with Ctrl+V, or use Upload to add media.</source>
 <context>
     <name>Aurora::MediaTile</name>
     <message>
-        <location filename="../src/ui/widgets/MediaTile.cpp" line="+159"/>
+        <location filename="../src/ui/widgets/MediaTile.cpp" line="+164"/>
         <source>…</source>
         <translation type="unfinished"></translation>
     </message>
@@ -2113,16 +2355,23 @@ Drop files here, paste with Ctrl+V, or use Upload to add media.</source>
     </message>
     <message>
         <location line="+2"/>
+        <location line="+7"/>
         <source>Info</source>
         <translation>Informationen</translation>
     </message>
     <message>
-        <location line="+2"/>
+        <location line="-4"/>
+        <source>Restore</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+6"/>
         <source>Copy</source>
         <translation>Kopieren</translation>
     </message>
     <message>
-        <location line="+1"/>
+        <location line="-8"/>
+        <location line="+9"/>
         <source>Download</source>
         <translation>Herunterladen</translation>
     </message>
@@ -2137,7 +2386,8 @@ Drop files here, paste with Ctrl+V, or use Upload to add media.</source>
         <translation>In den Papierkorb verschieben</translation>
     </message>
     <message>
-        <location line="+1"/>
+        <location line="-9"/>
+        <location line="+10"/>
         <source>Delete permanently</source>
         <translation>Endgültig löschen</translation>
     </message>
@@ -2165,7 +2415,12 @@ Drop files here, paste with Ctrl+V, or use Upload to add media.</source>
         <translation>In den Papierkorb verschieben</translation>
     </message>
     <message>
-        <location line="+2"/>
+        <location line="+1"/>
+        <source>Restore</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
         <source>Delete permanently</source>
         <translation>Endgültig löschen</translation>
     </message>
@@ -2195,13 +2450,13 @@ Drop files here, paste with Ctrl+V, or use Upload to add media.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+73"/>
+        <location line="+82"/>
         <source>Preview unavailable
 %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+30"/>
+        <location line="+35"/>
         <source>Media preview</source>
         <translation type="unfinished"></translation>
     </message>
@@ -2214,7 +2469,17 @@ Drop files here, paste with Ctrl+V, or use Upload to add media.</source>
 <context>
     <name>Aurora::SettingsPage</name>
     <message>
-        <location filename="../src/ui/pages/SettingsPage.cpp" line="+26"/>
+        <location filename="../src/ui/pages/SettingsPage.cpp" line="+33"/>
+        <source>Back</source>
+        <translation type="unfinished">Zurück</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Back (Esc)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+8"/>
         <source>Settings</source>
         <translation>Einstellungen</translation>
     </message>
@@ -2315,19 +2580,19 @@ Drop files here, paste with Ctrl+V, or use Upload to add media.</source>
 <context>
     <name>Aurora::Sidebar</name>
     <message>
-        <location filename="../src/ui/widgets/Sidebar.cpp" line="+23"/>
-        <location line="+74"/>
+        <location filename="../src/ui/widgets/Sidebar.cpp" line="+37"/>
+        <location line="+122"/>
         <source>Collapse</source>
         <translation>Einklappen</translation>
     </message>
     <message>
-        <location line="-49"/>
+        <location line="-66"/>
         <source>fan-made
 immich desktop  ·  %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+49"/>
+        <location line="+66"/>
         <source>Expand</source>
         <translation>Ausklappen</translation>
     </message>
@@ -2342,7 +2607,7 @@ immich desktop  ·  %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+66"/>
+        <location line="+122"/>
         <source>NAVIGATION</source>
         <translation>NAVIGATION</translation>
     </message>
@@ -2358,11 +2623,46 @@ immich desktop  ·  %1</source>
     </message>
     <message>
         <location line="+2"/>
+        <source>People</source>
+        <translation type="unfinished">Personen</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Favorites</source>
+        <translation type="unfinished">Favoriten</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Archive</source>
+        <translation type="unfinished">Archiv</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Albums</source>
+        <translation type="unfinished">Alben</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Tags</source>
+        <translation type="unfinished">Schlagwörter</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Folders</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Trash</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
         <source>Settings</source>
         <translation>Einstellungen</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+13"/>
         <source>SETTINGS</source>
         <translation>EINSTELLUNGEN</translation>
     </message>
@@ -2390,11 +2690,6 @@ immich desktop  ·  %1</source>
         <location line="+2"/>
         <source>About</source>
         <translation>Über</translation>
-    </message>
-    <message>
-        <location line="+2"/>
-        <source>Back</source>
-        <translation>Zurück</translation>
     </message>
 </context>
 <context>
@@ -2516,7 +2811,7 @@ immich desktop  ·  %1</source>
 <context>
     <name>Aurora::TopBar</name>
     <message>
-        <location filename="../src/ui/widgets/TopBar.cpp" line="+22"/>
+        <location filename="../src/ui/widgets/TopBar.cpp" line="+23"/>
         <source>Overview</source>
         <translation>Übersicht</translation>
     </message>
@@ -2908,12 +3203,12 @@ immich desktop  ·  %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/ui/pages/LibraryPage.cpp" line="-2424"/>
+        <location filename="../src/ui/pages/LibraryPage.cpp" line="-2435"/>
         <source>Media files (*.jpg *.jpeg *.png *.gif *.webp *.heic *.heif *.tif *.tiff *.bmp *.raw *.dng *.cr2 *.nef *.arw *.mp4 *.mov *.m4v *.avi *.mkv *.webm *.3gp);;All files (*.*)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../src/main.cpp" line="+74"/>
+        <location filename="../src/main.cpp" line="+70"/>
         <source>Updating translations…</source>
         <translation>Übersetzungen werden aktualisiert…</translation>
     </message>

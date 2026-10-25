@@ -3,9 +3,10 @@
 The source language is English. Qt Linguist catalogs (`immich_<locale>.ts`)
 contain application text, translator context, source locations and plural forms.
 Unfinished translations appear in English.
-Polish and Simplified Chinese are fully translated; Polish includes all three of
-its plural forms. Catalogs are published automatically and can be downloaded by
-existing app installations.
+English is complete. Polish and Simplified Chinese are nearly complete; new
+library-section strings still need translating (unfinished text falls back to
+English). Catalogs are published automatically and can be downloaded by existing
+app installations.
 
 The app follows the operating system's preferred UI languages, trying regional
 and script variants before a base language, then falling back to English.
@@ -43,11 +44,11 @@ GitHub's caches refresh. Embedded catalogs are still rebuilt for offline backups
 
 | Language | Code | Progress | Strings |
 | --- | --- | --- | ---: |
-| English | `en` | `██████████` 100% | 547 / 547 |
-| German (Deutsch) | `de` | `███░░░░░░░` 29% | 161 / 547 |
-| French (Français) | `fr` | `███░░░░░░░` 29% | 161 / 547 |
-| Polish (Polski) | `pl` | `██████████` 100% | 547 / 547 |
-| Chinese (简体) | `zh_CN` | `██████████` 100% | 547 / 547 |
+| English | `en` | `██████████` 100% | 597 / 597 |
+| German (Deutsch) | `de` | `███░░░░░░░` 27% | 160 / 597 |
+| French (Français) | `fr` | `███░░░░░░░` 27% | 160 / 597 |
+| Polish (Polski) | `pl` | `█████████░` 91% | 543 / 597 |
+| Chinese (简体) | `zh_CN` | `█████████░` 91% | 543 / 597 |
 
 _Auto-generated from `translations/immich_*.ts`. Run `python tools/update_translation_status.py` or `cmake --build build --target update_translations`._
 
