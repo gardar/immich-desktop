@@ -61,11 +61,11 @@ Sidebar::Sidebar(ThemeManager *themeManager, QWidget *parent)
     }
 
     auto *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(14, 18, 14, 14);
-    layout->setSpacing(8);
+    layout->setContentsMargins(12, 14, 12, 12);
+    layout->setSpacing(6);
 
     m_navigationLabel->setProperty("subheading", true);
-    m_navigationLabel->setContentsMargins(8, 4, 0, 8);
+    m_navigationLabel->setContentsMargins(8, 2, 0, 4);
     layout->addWidget(m_navigationLabel);
 
     auto *navigation = new QWidget;
@@ -73,7 +73,7 @@ Sidebar::Sidebar(ThemeManager *themeManager, QWidget *parent)
     auto *navigationColumn = new QVBoxLayout(navigation);
     navigationColumn->setContentsMargins(0, 0, 0, 0);
     m_navigationLayout->setContentsMargins(0, 0, 0, 0);
-    m_navigationLayout->setSpacing(8);
+    m_navigationLayout->setSpacing(3);
     navigationColumn->addLayout(m_navigationLayout);
     navigationColumn->addStretch();
     auto *scroll = new QScrollArea(this);
@@ -170,7 +170,7 @@ void Sidebar::refreshLayout(bool animate)
         button->setIconOnly(collapsed);
     updateTreeVisibility();
 
-    const int target = collapsed ? 76 : 224;
+    const int target = collapsed ? 68 : 224;
     m_widthAnimation->stop();
     if (animate && isVisible() && width() != target) {
         m_widthAnimation->setStartValue(width());
@@ -265,8 +265,8 @@ void Sidebar::addGroupLabel(const QString &text)
     label->setObjectName(QStringLiteral("sidebarGroupLabel"));
     label->setProperty("subheading", true);
     // Extra top gap after the first group so sections read as clusters, not one list.
-    const int top = m_navigationLayout->count() > 0 ? 12 : 2;
-    label->setContentsMargins(8, top, 0, 2);
+    const int top = m_navigationLayout->count() > 0 ? 8 : 0;
+    label->setContentsMargins(8, top, 0, 1);
     label->setVisible(!(m_themeManager->minimalistUi() || isCollapsed()));
     m_navigationLayout->addWidget(label);
 }

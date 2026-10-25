@@ -19,7 +19,7 @@ AnimatedButton::AnimatedButton(const QString &text, const QString &iconResource,
 {
     setCheckable(true);
     setCursor(Qt::PointingHandCursor);
-    setMinimumHeight(44);
+    setMinimumHeight(36);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     setToolTip(text);
     setAccessibleName(text);
@@ -41,9 +41,10 @@ void AnimatedButton::setHoverProgress(qreal progress)
 
 QSize AnimatedButton::sizeHint() const
 {
+    // Compact vertical padding so long sidebars stay scannable without excess stretch.
     if (m_themeManager->minimalistUi() || m_iconOnly || text().isEmpty())
-        return QSize(44, 44);
-    return QSize(46 + fontMetrics().horizontalAdvance(text()) + 14, 44);
+        return QSize(36, 36);
+    return QSize(46 + fontMetrics().horizontalAdvance(text()) + 14, 36);
 }
 
 void AnimatedButton::setIconOnly(bool iconOnly)
@@ -142,7 +143,7 @@ void AnimatedButton::paintEvent(QPaintEvent *)
     painter.setRenderHint(QPainter::TextAntialiasing);
     painter.setPen(Qt::NoPen);
     painter.setBrush(fill);
-    painter.drawRoundedRect(rect().adjusted(1, 1, -1, -1), 11, 11);
+    painter.drawRoundedRect(rect().adjusted(1, 1, -1, -1), 9, 9);
 
     painter.setPen(isChecked() ? QColor(Qt::white) : theme.text);
     QFont labelFont = font();
