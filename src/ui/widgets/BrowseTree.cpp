@@ -3,6 +3,7 @@
 #include "ui/FolderPaths.h"
 
 #include <QHeaderView>
+#include <QPainter>
 #include <QTreeWidgetItemIterator>
 
 namespace Aurora {
@@ -27,7 +28,10 @@ BrowseTree::BrowseTree(BrowseSection section, QWidget *parent)
     setObjectName(QStringLiteral("browseTree"));
     setHeaderHidden(true);
     setColumnCount(1);
-    setIndentation(14);
+    setIndentation(16);
+    // Flat album lists need no disclosure column; tags/folders keep nested guides.
+    setRootIsDecorated(section == BrowseSection::Tags || section == BrowseSection::Folders);
+    setUniformRowHeights(true);
     setFrameShape(QFrame::NoFrame);
     setExpandsOnDoubleClick(false);
     setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -226,6 +230,34 @@ void BrowseTree::activate(QTreeWidgetItem *item)
 void BrowseTree::updateHeight()
 {
     setFixedHeight(sizeHint().height());
+}
+
+void BrowseTree::drawBranches(QPainter *painter, const QRect &rect,
+                              const QModelIndex &index) const
+{
+    // Subtle L / | connectors for nested tags and folders (Albums stay a flat guide).
+    if (!rootIsDecorated())
+        return;
+
+    painter->save();
+    QPen pen(palette().color(QPalette::Mid));
+    pen.setWidth(1);
+    painter->setPen(pen);
+
+    const int midY = rect.center().y();
+    const int indent = indentation();
+    QModelIndex walk = index;
+    for (int level = 0; walk.isValid(); walk = walk.parent(), ++level) {
+        const int x = rect.right() - indent * level - indent / 2;
+        const bool lastSibling = !walk.siblingAtRow(walk.row() + 1).isValid();
+        if (level == 0) {
+            painter->drawLine(x, rect.top(), x, lastSibling ? midY : rect.bottom());
+            painter->drawLine(x, midY, rect.right() - 2, midY);
+        } else if (!lastSibling) {
+            painter->drawLine(x, rect.top(), x, rect.bottom());
+        }
+    }
+    painter->restore();
 }
 
 } // namespace Aurora

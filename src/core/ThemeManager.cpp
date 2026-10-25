@@ -165,16 +165,6 @@ QString ThemeManager::buildStyleSheet() const
             letter-spacing: 0.06em;
             text-transform: uppercase;
         }
-        QWidget#sidebarNavGroup {
-            background: transparent;
-            border: none;
-            border-left: 1px solid %4;
-            margin-left: 10px;
-        }
-        QWidget#sidebarNavGroup[flat="true"] {
-            border-left: none;
-            margin-left: 0;
-        }
         QLabel[section="true"] { font-size: 12pt; font-weight: 600; }
         QPushButton {
             background: %6;
@@ -236,13 +226,21 @@ QString ThemeManager::buildStyleSheet() const
             border-radius: 10px;
         }
         QFrame#assetInfoPanel { border-left: 1px solid %4; }
-        QTreeWidget#browseTree { background: transparent; border: none; outline: 0; }
+        QTreeWidget#browseTree {
+            background: transparent;
+            border: none;
+            border-left: 1px solid %4;
+            margin-left: 18px;
+            padding-left: 8px;
+            outline: 0;
+        }
         QTreeWidget#browseTree::item {
             padding: 5px 4px;
             border-radius: 8px;
         }
         QTreeWidget#browseTree::item:hover { background: %6; }
         QTreeWidget#browseTree::item:selected { background: %7; color: white; }
+        QTreeWidget#browseTree::branch { background: transparent; border-image: none; image: none; }
         QDialogButtonBox QPushButton { min-width: 88px; }
         QComboBox, QLineEdit, QSpinBox, QDoubleSpinBox, QDateEdit {
             background: %6;

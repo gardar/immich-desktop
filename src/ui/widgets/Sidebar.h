@@ -40,8 +40,6 @@ private:
     void addSectionNavigation(BrowseSection section, const QString &label,
                               const QString &icon);
     void addGroupLabel(const QString &text);
-    void beginNavGroup();
-    QVBoxLayout *navTarget() const;
     void clearNavigation();
     void showMainNavigation();
     void showSettingsNavigation();
@@ -53,7 +51,6 @@ private:
     ThemeManager *m_themeManager;
     QLabel *m_navigationLabel;
     QVBoxLayout *m_navigationLayout;
-    QVBoxLayout *m_currentGroupLayout = nullptr;
     QButtonGroup *m_navigationGroup;
     bool m_settingsMode = false;
     QLabel *m_version;

@@ -33,6 +33,10 @@ signals:
     void reloadRequested();
     void itemSelected();
 
+protected:
+    void drawBranches(QPainter *painter, const QRect &rect,
+                      const QModelIndex &index) const override;
+
 private:
     void clearItems();
     QTreeWidgetItem *addNote(const QString &text);
