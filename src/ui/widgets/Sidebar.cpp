@@ -153,7 +153,12 @@ void Sidebar::refreshLayout(bool animate)
 {
     const bool minimal = m_themeManager->minimalistUi();
     const bool collapsed = minimal || isCollapsed();
-    m_navigationLabel->setVisible(!collapsed);
+    // Top "SETTINGS" title only in settings mode; main nav uses group labels instead.
+    m_navigationLabel->setVisible(!collapsed && m_settingsMode);
+    for (QLabel *label : findChildren<QLabel *>()) {
+        if (label->objectName() == QStringLiteral("sidebarGroupLabel"))
+            label->setVisible(!collapsed);
+    }
     m_version->setVisible(!collapsed);
     m_toggleButton->setVisible(!minimal);
     m_toggleButton->setText(collapsed ? tr("Expand") : tr("Collapse"));
@@ -254,6 +259,18 @@ void Sidebar::addSectionNavigation(BrowseSection section, const QString &label,
     m_navigationLayout->addWidget(tree);
 }
 
+void Sidebar::addGroupLabel(const QString &text)
+{
+    auto *label = new QLabel(text, this);
+    label->setObjectName(QStringLiteral("sidebarGroupLabel"));
+    label->setProperty("subheading", true);
+    // Extra top gap after the first group so sections read as clusters, not one list.
+    const int top = m_navigationLayout->count() > 0 ? 12 : 2;
+    label->setContentsMargins(8, top, 0, 2);
+    label->setVisible(!(m_themeManager->minimalistUi() || isCollapsed()));
+    m_navigationLayout->addWidget(label);
+}
+
 void Sidebar::clearNavigation()
 {
     if (m_navigationGroup) {
@@ -280,8 +297,11 @@ void Sidebar::showMainNavigation()
         return;
 
     m_settingsMode = false;
-    m_navigationLabel->setText(tr("NAVIGATION"));
+    m_navigationLabel->clear();
+    m_navigationLabel->hide();
     clearNavigation();
+
+    addGroupLabel(tr("Main"));
     addNavigation(tr("Library"),
                   QStringLiteral(":/icons/images.svg"), 0);
     addNavigation(tr("Explore"),
@@ -289,6 +309,8 @@ void Sidebar::showMainNavigation()
     addSectionNavigation(BrowseSection::People, tr("People"), QStringLiteral(":/icons/users.svg"));
     addSectionNavigation(BrowseSection::Favorites, tr("Favorites"),
                          QStringLiteral(":/icons/heart.svg"));
+
+    addGroupLabel(tr("Collections"));
     addSectionNavigation(BrowseSection::Archive, tr("Archive"),
                          QStringLiteral(":/icons/archive.svg"));
     addSectionNavigation(BrowseSection::Albums, tr("Albums"),
@@ -296,9 +318,12 @@ void Sidebar::showMainNavigation()
     addSectionNavigation(BrowseSection::Tags, tr("Tags"), QStringLiteral(":/icons/tag.svg"));
     addSectionNavigation(BrowseSection::Folders, tr("Folders"),
                          QStringLiteral(":/icons/folder.svg"));
+
+    addGroupLabel(tr("Tools"));
     addSectionNavigation(BrowseSection::Trash, tr("Trash"), QStringLiteral(":/icons/trash.svg"));
     addNavigation(tr("Settings"),
                   QStringLiteral(":/icons/settings.svg"), 2);
+
     if (auto *libraryButton = m_navigationGroup->button(0))
         libraryButton->setChecked(true);
     updateTreeVisibility();
@@ -311,6 +336,7 @@ void Sidebar::showSettingsNavigation()
 
     m_settingsMode = true;
     m_navigationLabel->setText(tr("SETTINGS"));
+    m_navigationLabel->setVisible(!(m_themeManager->minimalistUi() || isCollapsed()));
     clearNavigation();
     addNavigation(tr("Immich Server"),
                   QStringLiteral(":/icons/server.svg"), 2);

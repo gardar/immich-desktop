@@ -36,9 +36,10 @@ signals:
 
 private:
     AnimatedButton *addNavigation(const QString &label, const QString &icon, int index,
-                                  bool checkable = true);
+                                   bool checkable = true);
     void addSectionNavigation(BrowseSection section, const QString &label,
                               const QString &icon);
+    void addGroupLabel(const QString &text);
     void clearNavigation();
     void showMainNavigation();
     void showSettingsNavigation();

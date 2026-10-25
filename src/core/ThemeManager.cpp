@@ -158,6 +158,13 @@ QString ThemeManager::buildStyleSheet() const
         }
         QLabel[heading="true"] { font-size: 19.5pt; font-weight: 700; }
         QLabel[subheading="true"] { color: %5; font-size: 9.75pt; }
+        QLabel#sidebarGroupLabel {
+            color: %5;
+            font-size: 8.5pt;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
         QLabel[section="true"] { font-size: 12pt; font-weight: 600; }
         QPushButton {
             background: %6;
