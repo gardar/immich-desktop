@@ -887,7 +887,7 @@
     </message>
     <message>
         <location line="+26"/>
-        <source>← Explore</source>
+        <source>Explore</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -1375,12 +1375,12 @@ to explore people, places, and recent media.</source>
     </message>
     <message>
         <location line="+19"/>
-        <source>← Library</source>
+        <source>Library</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+32"/>
-        <source>← Years</source>
+        <source>Years</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

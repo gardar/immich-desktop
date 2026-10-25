@@ -322,8 +322,6 @@ void Sidebar::showSettingsNavigation()
                   QStringLiteral(":/icons/refresh-cw.svg"), 5);
     addNavigation(tr("About"),
                   QStringLiteral(":/icons/star.svg"), 6);
-    addNavigation(tr("Back"),
-                  QStringLiteral(":/icons/arrow-left.svg"), 0, false);
     updateTreeVisibility();
 }
 

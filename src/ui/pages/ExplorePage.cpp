@@ -259,7 +259,6 @@ ExplorePage::ExplorePage(ThemeManager *themeManager, ImmichClient *client, QWidg
     collectionToolbarLayout->setContentsMargins(16, 12, 16, 12);
     collectionToolbarLayout->setSpacing(14);
 
-
     m_collectionHero = new QLabel(collectionToolbar);
     m_collectionHero->setFixedSize(64, 64);
     m_collectionHero->setAlignment(Qt::AlignCenter);
