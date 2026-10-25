@@ -217,7 +217,7 @@ ExplorePage::ExplorePage(ThemeManager *themeManager, ImmichClient *client, QWidg
     collectionToolbarLayout->setContentsMargins(16, 12, 16, 12);
     collectionToolbarLayout->setSpacing(14);
 
-    m_collectionBack = new QPushButton(tr("← Explore"), collectionToolbar);
+    m_collectionBack = new QPushButton(tr("Explore"), collectionToolbar);
     configureActionButton(m_collectionBack, QStringLiteral(":/icons/arrow-left.svg"));
     m_collectionBack->setCursor(Qt::PointingHandCursor);
 

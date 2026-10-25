@@ -888,8 +888,8 @@
     </message>
     <message>
         <location line="+26"/>
-        <source>← Explore</source>
-        <translation>← Odkrywaj</translation>
+        <source>Explore</source>
+        <translation>Odkrywaj</translation>
     </message>
     <message>
         <location line="+50"/>
@@ -1381,13 +1381,13 @@ aby odkrywać osoby, miejsca i ostatnio dodane multimedia.</translation>
     </message>
     <message>
         <location line="+19"/>
-        <source>← Library</source>
-        <translation>← Biblioteka</translation>
+        <source>Library</source>
+        <translation>Biblioteka</translation>
     </message>
     <message>
         <location line="+32"/>
-        <source>← Years</source>
-        <translation>← Lata</translation>
+        <source>Years</source>
+        <translation>Lata</translation>
     </message>
     <message>
         <location line="+23"/>

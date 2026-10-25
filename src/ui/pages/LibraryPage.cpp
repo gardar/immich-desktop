@@ -257,7 +257,7 @@ LibraryPage::LibraryPage(ThemeManager *themeManager, ImmichClient *client,
     auto *yearHeaderBar = new QWidget(yearPage);
     auto *yearHeaderLayout = new QHBoxLayout(yearHeaderBar);
     yearHeaderLayout->setContentsMargins(16, 12, 16, 10);
-    auto *backToLibraryButton = new QPushButton(tr("← Library"), yearHeaderBar);
+    auto *backToLibraryButton = new QPushButton(tr("Library"), yearHeaderBar);
     configureActionButton(backToLibraryButton, QStringLiteral(":/icons/arrow-left.svg"));
     backToLibraryButton->setCursor(Qt::PointingHandCursor);
     auto *yearHeading = new QLabel(tr("Years"), yearHeaderBar);
@@ -289,7 +289,7 @@ LibraryPage::LibraryPage(ThemeManager *themeManager, ImmichClient *client,
     auto *yearDetailHeaderBar = new QWidget(yearDetailPage);
     auto *yearDetailHeaderLayout = new QHBoxLayout(yearDetailHeaderBar);
     yearDetailHeaderLayout->setContentsMargins(16, 12, 16, 10);
-    auto *backToYearGridButton = new QPushButton(tr("← Years"), yearDetailHeaderBar);
+    auto *backToYearGridButton = new QPushButton(tr("Years"), yearDetailHeaderBar);
     configureActionButton(backToYearGridButton, QStringLiteral(":/icons/arrow-left.svg"));
     backToYearGridButton->setCursor(Qt::PointingHandCursor);
     m_yearDetailStatus->setProperty("heading", true);

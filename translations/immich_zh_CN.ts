@@ -888,8 +888,8 @@
     </message>
     <message>
         <location line="+26"/>
-        <source>← Explore</source>
-        <translation>← 探索</translation>
+        <source>Explore</source>
+        <translation>探索</translation>
     </message>
     <message>
         <location line="+50"/>
@@ -1375,13 +1375,13 @@ to explore people, places, and recent media.</source>
     </message>
     <message>
         <location line="+19"/>
-        <source>← Library</source>
-        <translation>← 媒体库</translation>
+        <source>Library</source>
+        <translation>媒体库</translation>
     </message>
     <message>
         <location line="+32"/>
-        <source>← Years</source>
-        <translation>← 年份</translation>
+        <source>Years</source>
+        <translation>年份</translation>
     </message>
     <message>
         <location line="+23"/>
