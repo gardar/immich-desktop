@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "sourceRevision": "2bacef039f38df4de8c94f09019fab25eba8aad4",
+  "catalogs": {
+    "de": {
+      "sha256": "64cebf4dcf7095faec7b9e3ef8f25b8b3a7963d921fdc7e37e9a9ad48b4fd3cf",
+      "size": 16491
+    },
+    "en": {
+      "sha256": "d09dcdf4e61bbad34bd950528e293d1edf235e4b7a762dab446095d7fbcd54ec",
+      "size": 82367
+    },
+    "fr": {
+      "sha256": "8407e96380f80ff7b54ccb6836b8cd02627ac88c2790a5122108cbdd73f2dc81",
+      "size": 16709
+    },
+    "pl": {
+      "sha256": "460fdb68581f25377a81873a1709aa85e1cf1a8cebfcc88dcb2bc5968df1228a",
+      "size": 83724
+    },
+    "zh_CN": {
+      "sha256": "35ba5299e03ded8e0dd9ef3260e69c981a2f584a2cd8fe36d28626d811101cc4",
+      "size": 57146
+    }
+  }
+}
