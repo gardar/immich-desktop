@@ -39,6 +39,7 @@ class FolderSyncService;
 class MediaTile;
 class MediaViewerDialog;
 class SummaryTile;
+class TileImageScheduler;
 class VideoHoverPreview;
 class ZoomSlider;
 
@@ -230,15 +231,15 @@ private:
     QPushButton *m_yearsButton;
     QTimer *m_layoutTimer;
     QTimer *m_visibilityTimer;
+    TileImageScheduler *m_tileImages;
     QTimer *m_autoCheckTimer;
     QTimer *m_searchDebounce;
     QList<DaySection> m_sections;
     QHash<QString, MediaTile *> m_tilesById;
     QSet<QString> m_favoriteRequests; // Sent from tile menus, awaiting a reply.
     QSet<QString> m_localAssetIds;
-    QSet<QString> m_requestedThumbnails;
+    QSet<QString> m_requestedThumbnails; // Local Folder Sync files only.
     QHash<QString, int> m_thumbnailRetries;
-    QHash<QString, int> m_requestedTileImages;
     QList<ImmichAsset> m_assets;
     QList<TimeBucketInfo> m_monthBuckets;
     // Progressive index: fetch several months in parallel, append in newest-first

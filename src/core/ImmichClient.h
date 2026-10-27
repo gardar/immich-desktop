@@ -67,11 +67,19 @@ public:
     void loadTags();
     void loadFolderPaths();
     void loadPeople();
-    void loadThumbnail(const QString &assetId);
+    // CacheOnly looks in the memory and disk caches without going to the server
+    // and stays silent on a miss; grids use it before deciding to fetch.
+    enum class ImageSource { CacheOrServer, CacheOnly };
+    // Server fetches run newest first; OnScreen ones go ahead of all others.
+    enum class FetchPriority { Normal, OnScreen };
+    void loadThumbnail(const QString &assetId, ImageSource source = ImageSource::CacheOrServer,
+                       FetchPriority priority = FetchPriority::Normal);
     void loadPreview(const QString &assetId);
     // Emits thumbnailLoaded with an image of up to maximumDimension pixels,
     // decoded from the preview when the thumbnail is too small.
-    void loadTileImage(const QString &assetId, int maximumDimension);
+    void loadTileImage(const QString &assetId, int maximumDimension,
+                       ImageSource source = ImageSource::CacheOrServer,
+                       FetchPriority priority = FetchPriority::Normal);
     void loadPersonThumbnail(const QString &personId);
     // Drop in-RAM thumbnail/preview pixmaps (disk cache kept). Call when the
     // window is hidden to tray/minimized so idle RSS stays low.
@@ -165,7 +173,9 @@ private:
                       const QJsonObject &searchOptions = {});
     void searchFilteredAssets(const QString &filterKind, const QString &filterValue,
                               int page, int pageSize);
-    void loadImageAsync(const QString &assetId, const QString &resultSize);
+    void loadImageAsync(const QString &assetId, const QString &resultSize,
+                        ImageSource source = ImageSource::CacheOrServer,
+                        FetchPriority fetchPriority = FetchPriority::Normal);
     void finishExploreLoad(bool peopleDone, bool exploreDone, const QString &error);
     bool emitCachedLibrary(const QString &query);
     bool emitCachedExplore();
@@ -215,7 +225,8 @@ private:
     // hundreds of timeline months made Library loading quadratic.
     QTimer *m_cacheFlushTimer;
     QList<ImmichAsset> m_pendingCacheAssets;
-    QSet<QString> m_pendingImages;
+    QHash<QString, int> m_pendingImages; // Key -> priority of the queued job.
+    int m_imageRequestSerial = 0; // Later server fetches run first.
     QSet<QString> m_pendingPersonImages;
     QStringList m_uploadQueue;
     QString m_uploadInFlightPath;

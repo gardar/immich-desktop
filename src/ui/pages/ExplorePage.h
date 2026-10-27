@@ -34,6 +34,7 @@ class ThemeManager;
 class MediaTile;
 class MediaViewerDialog;
 class VideoHoverPreview;
+class TileImageScheduler;
 class ZoomSlider;
 
 class ExploreCard final : public QFrame {
@@ -231,8 +232,7 @@ private:
     QList<DaySection> m_collectionSections;
     QHash<QString, QPointer<MediaTile>> m_collectionTiles;
     QSet<QString> m_favoriteRequests; // Sent from tile menus, awaiting a reply.
-    QSet<QString> m_collectionRequestedThumbs;
-    QHash<QString, int> m_collectionRequestedTileImages;
+    TileImageScheduler *m_collectionTileImages = nullptr;
     QString m_collectionFilterKind;
     QString m_collectionFilterValue;
     QString m_collectionHeroAssetId;

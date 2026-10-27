@@ -28,6 +28,7 @@
 #include <QUrlQuery>
 
 #include <algorithm>
+#include <climits>
 #include <memory>
 
 namespace Aurora {
@@ -1365,7 +1366,8 @@ QImage ImmichClient::decodeImage(const QByteArray &bytes, int maximumDimension) 
     return image;
 }
 
-void ImmichClient::loadThumbnail(const QString &assetId)
+void ImmichClient::loadThumbnail(const QString &assetId, ImageSource source,
+                                 FetchPriority priority)
 {
     if (!ensureConfigured(tr("Load image")) || assetId.isEmpty())
         return;
@@ -1375,7 +1377,7 @@ void ImmichClient::loadThumbnail(const QString &assetId)
         return;
     }
 
-    loadImageAsync(assetId, QStringLiteral("thumbnail"));
+    loadImageAsync(assetId, QStringLiteral("thumbnail"), source, priority);
 }
 
 void ImmichClient::loadPreview(const QString &assetId)
@@ -1383,13 +1385,14 @@ void ImmichClient::loadPreview(const QString &assetId)
     loadImageAsync(assetId, QStringLiteral("preview"));
 }
 
-void ImmichClient::loadTileImage(const QString &assetId, int maximumDimension)
+void ImmichClient::loadTileImage(const QString &assetId, int maximumDimension,
+                                 ImageSource source, FetchPriority priority)
 {
     if (maximumDimension <= 256) {
-        loadThumbnail(assetId);
+        loadThumbnail(assetId, source, priority);
         return;
     }
-    loadImageAsync(assetId, QStringLiteral("tile:%1").arg(maximumDimension));
+    loadImageAsync(assetId, QStringLiteral("tile:%1").arg(maximumDimension), source, priority);
 }
 
 bool ImmichClient::isUploading() const
@@ -2150,7 +2153,8 @@ void ImmichClient::createSharedLink(const QString &assetId, const QUuid &request
     });
 }
 
-void ImmichClient::loadImageAsync(const QString &assetId, const QString &resultSize)
+void ImmichClient::loadImageAsync(const QString &assetId, const QString &resultSize,
+                                  ImageSource source, FetchPriority fetchPriority)
 {
     if (!ensureConfigured(tr("Load image")))
         return;
@@ -2159,10 +2163,30 @@ void ImmichClient::loadImageAsync(const QString &assetId, const QString &resultS
         return;
     }
 
-    const QString pendingKey = resultSize + u':' + assetId;
-    if (m_pendingImages.contains(pendingKey))
+    const bool cacheOnly = source == ImageSource::CacheOnly;
+    const QString pendingKey =
+        (cacheOnly ? QStringLiteral("cached:") : QString()) + resultSize + u':' + assetId;
+    // Cache reads are quick and always run first, so what's on disk never waits
+    // behind server fetches. The viewer's preview comes next, then on-screen
+    // tiles, then the rest; within each, newest first, so what's in view now
+    // beats tiles scrolled past earlier.
+    constexpr int kOnScreenBand = 1 << 29;
+    if (m_imageRequestSerial >= kOnScreenBand - 1)
+        m_imageRequestSerial = 0;
+    int priority = INT_MAX;
+    if (!cacheOnly && resultSize == QStringLiteral("preview"))
+        priority = INT_MAX - 1;
+    else if (!cacheOnly)
+        priority = ++m_imageRequestSerial +
+                   (fetchPriority == FetchPriority::OnScreen ? kOnScreenBand : 0);
+
+    // Already queued: only queue again to move an off-screen prefetch up once its
+    // tile is on screen. The later job finds the first one's result in the cache.
+    const auto pending = m_pendingImages.constFind(pendingKey);
+    if (pending != m_pendingImages.cend() &&
+        (pending.value() >= kOnScreenBand || priority < kOnScreenBand))
         return;
-    m_pendingImages.insert(pendingKey);
+    m_pendingImages.insert(pendingKey, priority);
 
     const ImmichConnectionSettings connection = m_connection;
     const QString serverUrl = activeServerUrl();
@@ -2175,7 +2199,7 @@ void ImmichClient::loadImageAsync(const QString &assetId, const QString &resultS
     const bool usesPreview = tileImage || resultSize == QStringLiteral("preview");
 
     m_imagePool.start([this, self, assetId, resultSize, pendingKey, connection, serverUrl,
-                       sslConfig, tileImage, tileDimension, usesPreview] {
+                       sslConfig, tileImage, tileDimension, usesPreview, cacheOnly] {
         auto finishFail = [self, assetId, resultSize, pendingKey](const QString &message) {
             if (!self)
                 return;
@@ -2256,6 +2280,14 @@ void ImmichClient::loadImageAsync(const QString &assetId, const QString &resultS
                     return;
                 }
             }
+        }
+
+        if (cacheOnly) {
+            QMetaObject::invokeMethod(self, [self, pendingKey] {
+                if (self)
+                    self->m_pendingImages.remove(pendingKey);
+            }, Qt::QueuedConnection);
+            return;
         }
 
         auto fetchSize = [&](const QString &size, bool reportError) -> QByteArray {
@@ -2357,7 +2389,7 @@ void ImmichClient::loadImageAsync(const QString &assetId, const QString &resultS
         else if (tileImage)
             cacheBytes = previewBytes;
         finishImage(image, cacheBytes);
-    });
+    }, priority);
 }
 
 } // namespace Aurora
