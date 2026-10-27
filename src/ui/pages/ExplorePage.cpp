@@ -4,6 +4,7 @@
 #include "ui/FolderPaths.h"
 #include "ui/GridZoom.h"
 #include "ui/IconUtils.h"
+#include "ui/TileImageScheduler.h"
 #include "ui/widgets/FlowLayout.h"
 #include "ui/widgets/MediaTile.h"
 #include "ui/widgets/MediaViewerDialog.h"
@@ -344,6 +345,8 @@ ExplorePage::ExplorePage(ThemeManager *themeManager, ImmichClient *client, QWidg
     connect(m_collectionLayoutTimer, &QTimer::timeout, this, &ExplorePage::layoutCollection);
 
     m_collectionVisibilityTimer = new QTimer(this);
+    m_collectionTileImages =
+        new TileImageScheduler(m_client, [this] { scheduleCollectionVisibility(); }, this);
     m_collectionVisibilityTimer->setSingleShot(true);
     m_collectionVisibilityTimer->setInterval(60);
     connect(m_collectionVisibilityTimer, &QTimer::timeout, this,
@@ -631,7 +634,7 @@ void ExplorePage::releaseUiPixmaps()
         if (MediaTile *tile = it.value().data())
             tile->clearThumbnail();
     }
-    m_collectionRequestedThumbs.clear();
+    m_collectionTileImages->clear();
     m_personThumbCache.clear();
 
     if (m_collectionHero)
@@ -832,6 +835,7 @@ void ExplorePage::showAssetThumbnail(const QString &assetId, const QPixmap &thum
         card->setPixmap(thumbnail);
 
     if (const QPointer<MediaTile> tile = m_collectionTiles.value(assetId)) {
+        m_collectionTileImages->finished(assetId);
         tile->setThumbnail(thumbnail);
         if (GridZoom::tileImageDimension(tile->size(), tile->devicePixelRatioF()) >
             tile->thumbnailDimension())
@@ -1271,7 +1275,7 @@ void ExplorePage::removeCollectionTiles(const QStringList &assetIds)
             continue;
         for (DaySection &section : m_collectionSections)
             section.tiles.removeAll(tile.data());
-        m_collectionRequestedThumbs.remove(assetId);
+        m_collectionTileImages->tileLeft(assetId, true);
         tile->deleteLater();
     }
 
@@ -1300,7 +1304,7 @@ void ExplorePage::clearCollectionTimeline()
     }
     m_collectionSections.clear();
     m_collectionTiles.clear();
-    m_collectionRequestedThumbs.clear();
+    m_collectionTileImages->clear();
     m_collectionHost->resize(m_collectionScroll->viewport()->width(), 1);
 }
 
@@ -1530,45 +1534,27 @@ void ExplorePage::updateVisibleCollectionThumbs()
     const QRect buffered(0, qMax(0, scrollTop - viewportHeight), m_collectionHost->width(),
                          viewportHeight * 3);
 
-    constexpr int kMaxRequests = 20;
-    int requested = 0;
+    const int middle = scrollTop + viewportHeight / 2;
+    QList<MediaTile *> nearTiles;
     for (auto it = m_collectionTiles.cbegin(); it != m_collectionTiles.cend(); ++it) {
         MediaTile *tile = it.value().data();
         if (!tile)
             continue;
-
         if (!buffered.intersects(tile->geometry())) {
-            if (tile->hasThumbnail()) {
+            const bool hadImage = tile->hasThumbnail();
+            if (hadImage)
                 tile->clearThumbnail();
-                m_collectionRequestedThumbs.remove(it.key());
-                m_collectionRequestedTileImages.remove(it.key());
-            }
+            m_collectionTileImages->tileLeft(it.key(), hadImage);
             continue;
         }
-
-        if (tile->hasThumbnail()) {
-            const int wanted =
-                GridZoom::tileImageDimension(tile->size(), tile->devicePixelRatioF());
-            if (wanted > tile->thumbnailDimension() &&
-                wanted > m_collectionRequestedTileImages.value(it.key())) {
-                m_collectionRequestedTileImages.insert(it.key(), wanted);
-                m_client->loadTileImage(it.key(), wanted);
-                if (++requested >= kMaxRequests) {
-                    scheduleCollectionVisibility();
-                    break;
-                }
-            }
-            continue;
-        }
-        if (tile->hasThumbnailError() || m_collectionRequestedThumbs.contains(it.key()))
-            continue;
-        m_collectionRequestedThumbs.insert(it.key());
-        m_client->loadThumbnail(it.key());
-        if (++requested >= kMaxRequests) {
-            scheduleCollectionVisibility();
-            break;
-        }
+        nearTiles.append(tile);
     }
+    std::sort(nearTiles.begin(), nearTiles.end(), [middle](MediaTile *a, MediaTile *b) {
+        return qAbs(a->geometry().center().y() - middle) <
+               qAbs(b->geometry().center().y() - middle);
+    });
+    m_collectionTileImages->update(nearTiles,
+                                   QRect(0, scrollTop, m_collectionHost->width(), viewportHeight));
 }
 
 void ExplorePage::updateCollectionLoadMore(const QString &nextPage)

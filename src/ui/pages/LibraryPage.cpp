@@ -4,6 +4,7 @@
 #include "core/FolderSyncService.h"
 #include "ui/GridZoom.h"
 #include "ui/IconUtils.h"
+#include "ui/TileImageScheduler.h"
 #include "ui/widgets/MediaTile.h"
 #include "ui/widgets/MediaViewerDialog.h"
 #include "ui/widgets/ShareLinkDialog.h"
@@ -115,6 +116,7 @@ LibraryPage::LibraryPage(ThemeManager *themeManager, ImmichClient *client,
     , m_yearsButton(new QPushButton(tr("Years"), this))
     , m_layoutTimer(new QTimer(this))
     , m_visibilityTimer(new QTimer(this))
+    , m_tileImages(new TileImageScheduler(client, [this] { scheduleVisibleMediaUpdate(); }, this))
     , m_autoCheckTimer(new QTimer(this))
     , m_searchDebounce(new QTimer(this))
 {
@@ -1687,6 +1689,7 @@ void LibraryPage::showThumbnail(const QString &assetId, const QPixmap &thumbnail
     }
 
     m_requestedThumbnails.remove(assetId);
+    m_tileImages->finished(assetId);
     m_thumbnailRetries.remove(assetId);
     const QPointer<MediaTile> tile = m_tilesById.value(assetId);
     if (!tile || m_tilesById.value(assetId) != tile.data())
@@ -1715,6 +1718,7 @@ void LibraryPage::showThumbnailError(const QString &assetId, const QString &resu
     if (resultSize != QStringLiteral("thumbnail"))
         return;
     m_requestedThumbnails.remove(assetId);
+    m_tileImages->finished(assetId);
     const QPointer<MediaTile> tile = m_tilesById.value(assetId);
     if (!tile || m_tilesById.value(assetId) != tile.data() || !isTileNearViewport(tile))
         return;
@@ -1794,6 +1798,7 @@ void LibraryPage::clearTimeline()
     m_tilesById.clear();
     m_localAssetIds.clear();
     m_requestedThumbnails.clear();
+    m_tileImages->clear();
     m_assets.clear();
     m_readyBucketAssets.clear();
     m_inflightBuckets.clear();
@@ -1946,8 +1951,10 @@ void LibraryPage::updateVisibleMedia()
             tile->setVisible(keepRect.intersects(tile->geometry()));
     }
 
-    constexpr int kMaxThumbnailRequestsPerTick = 16;
-    int requested = 0;
+    // Local Folder Sync files load from disk here; the rest go to the
+    // scheduler, nearest the middle of the screen first.
+    const int middle = scrollTop + viewportHeight / 2;
+    QList<MediaTile *> nearTiles;
     for (auto it = m_tilesById.cbegin(); it != m_tilesById.cend(); ++it) {
         MediaTile *tile = it.value();
         const QString assetId = it.key();
@@ -1957,42 +1964,31 @@ void LibraryPage::updateVisibleMedia()
         if (!keepRect.intersects(tile->geometry())) {
             // Coming back to a failed tile later should try again.
             tile->clearThumbnailError();
-            if (tile->hasThumbnail()) {
+            const bool hadImage = tile->hasThumbnail();
+            if (hadImage) {
                 tile->clearThumbnail();
                 m_requestedThumbnails.remove(assetId);
-                m_requestedTileImages.remove(assetId);
             }
+            m_tileImages->tileLeft(assetId, hadImage);
             continue;
         }
 
-        if (tile->hasThumbnail()) {
-            const int wanted =
-                GridZoom::tileImageDimension(tile->size(), tile->devicePixelRatioF());
-            if (wanted > tile->thumbnailDimension() &&
-                wanted > m_requestedTileImages.value(assetId) &&
-                !m_localAssetIds.contains(assetId)) {
-                m_requestedTileImages.insert(assetId, wanted);
-                m_client->loadTileImage(assetId, wanted);
-                if (++requested >= kMaxThumbnailRequestsPerTick) {
-                    scheduleVisibleMediaUpdate();
-                    break;
-                }
+        if (m_localAssetIds.contains(assetId)) {
+            if (!tile->hasThumbnail() && !tile->hasThumbnailError() &&
+                !m_requestedThumbnails.contains(assetId)) {
+                m_requestedThumbnails.insert(assetId);
+                loadLocalThumbnail(tile, tile->asset());
             }
             continue;
         }
-        if (tile->hasThumbnailError() || m_requestedThumbnails.contains(assetId))
-            continue;
-        m_requestedThumbnails.insert(assetId);
-        if (m_localAssetIds.contains(assetId)) {
-            loadLocalThumbnail(tile, tile->asset());
-        } else {
-            m_client->loadThumbnail(assetId);
-        }
-        if (++requested >= kMaxThumbnailRequestsPerTick) {
-            scheduleVisibleMediaUpdate();
-            break;
-        }
+        nearTiles.append(tile);
     }
+    std::sort(nearTiles.begin(), nearTiles.end(), [middle](MediaTile *a, MediaTile *b) {
+        return qAbs(a->geometry().center().y() - middle) <
+               qAbs(b->geometry().center().y() - middle);
+    });
+    m_tileImages->update(nearTiles,
+                         QRect(0, scrollTop, m_timelineHost->width(), viewportHeight));
 }
 
 void LibraryPage::updateEmptyState()
@@ -2421,6 +2417,7 @@ void LibraryPage::removeAssetsFromTimeline(const QStringList &assetIds)
 
     for (const QString &id : ids) {
         m_requestedThumbnails.remove(id);
+        m_tileImages->tileLeft(id, true);
         if (MediaTile *tile = m_tilesById.take(id))
             tile->deleteLater();
     }
@@ -2715,6 +2712,7 @@ void LibraryPage::hideEvent(QHideEvent *event)
     // Allow thumbs to be requested again on show (clearThumbnail alone left
     // ids stuck in this set and the grid stayed blank).
     m_requestedThumbnails.clear();
+    m_tileImages->clear();
     setDropHighlight(false);
     updateAutoCheckTimer();
 }

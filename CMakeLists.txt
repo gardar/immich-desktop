@@ -81,6 +81,8 @@ set(IMMICH_SOURCES
     src/ui/MainWindow.h
     src/ui/MainWindowHost.cpp
     src/ui/MainWindowHost.h
+    src/ui/TileImageScheduler.cpp
+    src/ui/TileImageScheduler.h
     src/ui/pages/AboutPage.cpp
     src/ui/pages/AboutPage.h
     src/ui/pages/AppearancePage.cpp
