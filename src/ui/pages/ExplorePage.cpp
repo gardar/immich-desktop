@@ -853,8 +853,12 @@ void ExplorePage::showRequestError(const QString &operation, const QString &mess
     if (operation != tr("Load explore"))
         return;
     if (m_collectionLoadingMore) {
+        // Stop loading by itself so a failing server isn't asked again on every scroll.
         m_collectionLoadingMore = false;
-        updateCollectionLoadMore(m_collectionNextPage);
+        m_collectionLoadFailed = true;
+        m_collectionLoadMore->setEnabled(true);
+        m_collectionLoadMore->setVisible(true);
+        setActionButtonLabel(m_collectionLoadMore, tr("Try again"));
         m_collectionSubtitle->setText(tr("Couldn't load more: %1").arg(message));
         return;
     }
@@ -1208,6 +1212,7 @@ void ExplorePage::showCollectionPage(const QString &title, const QString &subtit
     m_collectionPersonStyle = personStyle;
     m_collectionNextPage.clear();
     m_collectionLoadingMore = false;
+    m_collectionLoadFailed = false;
     m_collectionCompactGrid = AppSettings().loadTimeline().compactGrid;
     m_collectionTileSize = GridZoom::clamp(AppSettings().loadTimeline().tileSize);
     m_collectionZoomSlider->setValue(m_collectionTileSize);
@@ -1528,6 +1533,7 @@ void ExplorePage::updateVisibleCollectionThumbs()
 {
     if (m_stack->currentIndex() != static_cast<int>(Page::Collection))
         return;
+    maybeLoadMoreCollection();
 
     const int viewportHeight = m_collectionScroll->viewport()->height();
     const int scrollTop = m_collectionScroll->verticalScrollBar()->value();
@@ -1557,15 +1563,23 @@ void ExplorePage::updateVisibleCollectionThumbs()
                                    QRect(0, scrollTop, m_collectionHost->width(), viewportHeight));
 }
 
+// More photos load by themselves while scrolling; the button only shows while a
+// batch is loading, or as "Try again" when one failed.
 void ExplorePage::updateCollectionLoadMore(const QString &nextPage)
 {
     m_collectionNextPage = nextPage;
-    bool ok = false;
-    const int page = nextPage.toInt(&ok);
-    const bool hasMore = ok && page > 0;
-    m_collectionLoadMore->setEnabled(hasMore);
-    m_collectionLoadMore->setVisible(hasMore);
-    setActionButtonLabel(m_collectionLoadMore, tr("Load more"));
+    m_collectionLoadMore->setVisible(false);
+}
+
+void ExplorePage::maybeLoadMoreCollection()
+{
+    if (m_collectionLoadingMore || m_collectionLoadFailed)
+        return;
+    // Start about two screens before the end, so the next batch is there in time.
+    // A batch too short to scroll counts as near the end, so it keeps filling.
+    const QScrollBar *bar = m_collectionScroll->verticalScrollBar();
+    if (bar->maximum() - bar->value() <= 2 * m_collectionScroll->viewport()->height())
+        requestCollectionNextPage();
 }
 
 void ExplorePage::requestCollectionNextPage()
@@ -1576,7 +1590,9 @@ void ExplorePage::requestCollectionNextPage()
         return;
 
     m_collectionLoadingMore = true;
+    m_collectionLoadFailed = false;
     m_collectionLoadMore->setEnabled(false);
+    m_collectionLoadMore->setVisible(true);
     setActionButtonLabel(m_collectionLoadMore, tr("Loading…"));
 
     m_client->loadCollectionAssets(m_collectionFilterKind, m_collectionFilterValue, page);

@@ -118,6 +118,7 @@ private slots:
     void openPlace(const Aurora::ImmichPlace &place);
     void backToBrowse();
     void requestCollectionNextPage();
+    void maybeLoadMoreCollection();
     void layoutCollection();
     void updateVisibleCollectionThumbs();
 
@@ -240,6 +241,7 @@ private:
     QString m_pendingCollectionTitle;
     bool m_pendingPersonStyle = false;
     bool m_collectionLoadingMore = false;
+    bool m_collectionLoadFailed = false; // Stops loading on scroll until "Try again".
     bool m_collectionPersonStyle = false;
     bool m_collectionCompactGrid = false;
     int m_collectionTileSize = 180;
