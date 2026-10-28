@@ -61,6 +61,8 @@ signals:
     void folderRequested(const QString &path, const QString &title);
 
 public slots:
+    // Back to the newest photos, leaving Years if it's open.
+    void scrollToTop();
     void showDay(const QDate &day);
     void copyAsset(const Aurora::ImmichAsset &asset);
     void downloadAsset(const Aurora::ImmichAsset &asset);
@@ -113,6 +115,7 @@ private slots:
     void backToYearGrid();
 
 private:
+    void scrollCurrent(bool toTop);
     struct DaySection {
         QDate date;
         QLabel *header = nullptr;
