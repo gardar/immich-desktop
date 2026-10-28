@@ -100,7 +100,14 @@ TopBar::TopBar(ThemeManager *themeManager, QWidget *parent)
 
 void TopBar::refreshProfiles()
 {
-    for (const auto &profile : AppSettings::profiles()) {
+    const auto profiles = AppSettings::profiles();
+    // No switcher when there is only one saved account.
+    m_profileButton->setVisible(profiles.size() > 1);
+    if (profiles.size() <= 1) {
+        window()->setWindowTitle(QStringLiteral("immich"));
+        return;
+    }
+    for (const auto &profile : profiles) {
         if (profile.id == AppSettings::activeProfileId()) {
             m_profileButton->setText(profile.name);
             window()->setWindowTitle(tr("immich - %1").arg(profile.name));

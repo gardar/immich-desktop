@@ -277,9 +277,12 @@ ConnectionPage::ConnectionPage(ImmichClient *client, QWidget *parent)
     const auto refresh = [this, selector] {
         const QSignalBlocker blocker(selector);
         selector->clear();
-        for (const auto &profile : AppSettings::profiles())
+        const auto profiles = AppSettings::profiles();
+        for (const auto &profile : profiles)
             selector->addItem(profile.name, profile.id);
         selector->setCurrentIndex(selector->findData(AppSettings::activeProfileId()));
+        // Hide the account picker until a second profile exists.
+        selector->setVisible(profiles.size() > 1);
         emit profilesChanged();
     };
     refresh();
@@ -347,10 +350,13 @@ ConnectionPage::ConnectionPage(ImmichClient *client, QWidget *parent)
         }
     });
     connect(this, &ConnectionPage::profilesChanged, this, [defaultProfile] {
+        const bool multi = AppSettings::profiles().size() > 1;
         const bool isDefault = AppSettings::activeProfileId() == AppSettings::defaultProfileId();
+        defaultProfile->setVisible(multi);
         defaultProfile->setChecked(isDefault);
-        defaultProfile->setEnabled(!isDefault);
+        defaultProfile->setEnabled(multi && !isDefault);
     });
+    defaultProfile->setVisible(AppSettings::profiles().size() > 1);
     profileLayout->addWidget(defaultProfile);
     scrollLayout->addWidget(profilesCard);
     scrollLayout->addWidget(card);
