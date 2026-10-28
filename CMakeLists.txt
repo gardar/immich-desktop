@@ -118,6 +118,8 @@ set(IMMICH_SOURCES
     src/ui/widgets/NoWheelComboBox.h
     src/ui/widgets/MediaViewerDialog.cpp
     src/ui/widgets/MediaViewerDialog.h
+    src/ui/widgets/ScrollToTopButton.cpp
+    src/ui/widgets/ScrollToTopButton.h
     src/ui/widgets/ShareLinkDialog.cpp
     src/ui/widgets/ShareLinkDialog.h
     src/ui/widgets/SummaryTile.cpp

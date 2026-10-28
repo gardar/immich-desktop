@@ -7,6 +7,7 @@
 #include "ui/TileImageScheduler.h"
 #include "ui/widgets/MediaTile.h"
 #include "ui/widgets/MediaViewerDialog.h"
+#include "ui/widgets/ScrollToTopButton.h"
 #include "ui/widgets/ShareLinkDialog.h"
 #include "ui/widgets/SummaryTile.h"
 #include "ui/widgets/Toast.h"
@@ -221,6 +222,16 @@ LibraryPage::LibraryPage(ThemeManager *themeManager, ImmichClient *client,
     m_scrollArea->setFrameShape(QFrame::NoFrame);
     m_scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_scrollArea->setWidget(m_timelineHost);
+    new ScrollToTopButton(m_scrollArea);
+    // Home/End jump within whichever grid is showing; a focused text field keeps
+    // the keys for its cursor.
+    for (const bool top : {true, false}) {
+        const Qt::Key key = top ? Qt::Key_Home : Qt::Key_End;
+        for (const QKeySequence &keys : {QKeySequence(key), QKeySequence(Qt::CTRL | key)}) {
+            connect(new QShortcut(keys, this), &QShortcut::activated, this,
+                    [this, top] { scrollCurrent(top); });
+        }
+    }
     m_scrollArea->setAcceptDrops(true);
     m_scrollArea->viewport()->setAcceptDrops(true);
     m_scrollArea->installEventFilter(this);
@@ -915,6 +926,24 @@ void LibraryPage::resetSearchFilters()
     m_resettingSearchOptions = false;
     m_searchDebounce->stop();
     applySearch();
+}
+
+void LibraryPage::scrollToTop()
+{
+    if (m_contentStack->currentIndex() != 0)
+        backToLibrary();
+    m_scrollArea->verticalScrollBar()->setValue(0);
+}
+
+void LibraryPage::scrollCurrent(bool toTop)
+{
+    QScrollArea *area = m_scrollArea;
+    if (m_contentStack->currentIndex() == 1)
+        area = m_yearScrollArea;
+    else if (m_contentStack->currentIndex() == 2)
+        area = m_yearDetailScrollArea;
+    QScrollBar *bar = area->verticalScrollBar();
+    bar->setValue(toTop ? 0 : bar->maximum());
 }
 
 void LibraryPage::showDay(const QDate &day)

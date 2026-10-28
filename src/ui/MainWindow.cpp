@@ -276,6 +276,12 @@ MainWindow::MainWindow(ThemeManager *themeManager, UpdateManager *updateManager,
     bodyLayout->addWidget(workspace, 1);
     root->addWidget(body, 1);
 
+    // Clicking Library while already on it goes back to the top. Connected before
+    // selectPage so that coming from another page keeps the scroll position.
+    connect(m_sidebar, &Sidebar::pageRequested, this, [this, libraryPage](int index) {
+        if (index == 0 && m_pageIndex == 0)
+            libraryPage->scrollToTop();
+    });
     connect(m_sidebar, &Sidebar::pageRequested, this, &MainWindow::selectPage);
     connect(m_settingsPage, &SettingsPage::backRequested, this,
             [this] { selectPage(m_lastMainPage); });

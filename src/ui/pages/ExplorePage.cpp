@@ -8,6 +8,7 @@
 #include "ui/widgets/FlowLayout.h"
 #include "ui/widgets/MediaTile.h"
 #include "ui/widgets/MediaViewerDialog.h"
+#include "ui/widgets/ScrollToTopButton.h"
 #include "ui/widgets/ShareLinkDialog.h"
 #include "ui/widgets/Toast.h"
 #include "ui/widgets/VideoHoverPreview.h"
@@ -326,6 +327,7 @@ ExplorePage::ExplorePage(ThemeManager *themeManager, ImmichClient *client, QWidg
     m_collectionHost = new QWidget;
     m_collectionHost->setObjectName(QStringLiteral("timelineHost"));
     m_collectionScroll->setWidget(m_collectionHost);
+    new ScrollToTopButton(m_collectionScroll);
     m_collectionScroll->viewport()->installEventFilter(this);
     connect(m_collectionScroll->verticalScrollBar(), &QScrollBar::valueChanged, this,
             [this](int) { scheduleCollectionVisibility(); });
@@ -411,6 +413,23 @@ ExplorePage::ExplorePage(ThemeManager *themeManager, ImmichClient *client, QWidg
     m_indexScroll = new QScrollArea(m_indexPage);
     m_indexScroll->setObjectName(QStringLiteral("libraryScroll"));
     m_indexScroll->setWidget(m_indexHost);
+    new ScrollToTopButton(m_indexScroll);
+    // Home/End jump within whichever page is showing (overview, index or grid).
+    auto scrollCurrent = [this](bool toTop) {
+        QScrollArea *area = m_browseScroll;
+        if (m_stack->currentIndex() == static_cast<int>(Page::Collection))
+            area = m_collectionScroll;
+        else if (m_stack->currentIndex() == static_cast<int>(Page::Index))
+            area = m_indexScroll;
+        area->verticalScrollBar()->setValue(toTop ? 0 : area->verticalScrollBar()->maximum());
+    };
+    for (const bool top : {true, false}) {
+        const Qt::Key key = top ? Qt::Key_Home : Qt::Key_End;
+        for (const QKeySequence &keys : {QKeySequence(key), QKeySequence(Qt::CTRL | key)}) {
+            connect(new QShortcut(keys, this), &QShortcut::activated, this,
+                    [scrollCurrent, top] { scrollCurrent(top); });
+        }
+    }
     m_indexScroll->setWidgetResizable(true);
     m_indexScroll->setFrameShape(QFrame::NoFrame);
     m_indexScroll->viewport()->installEventFilter(this);

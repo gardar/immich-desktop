@@ -29,7 +29,7 @@
 
 ## Features
 
-- **Library** - Immich-style timeline with day groups, Years view, zoomable grids (Ctrl+scroll), and progressive month loading
+- **Library** - Immich-style timeline with day groups, Years view, zoomable grids (Ctrl+scroll), and progressive month loading; Home/End or the back-to-top button jump through long grids
 - **Explore** - people, places, and recent media; open a person or place as an in-app Library-style gallery
 - **Library sections** - People, Favorites, Archive, Albums, Tags, Folders, and Trash in the sidebar; albums, tags, and folders expand into lists, and the trash can restore or permanently delete
 - **Viewer** - step through photos and videos with on-screen controls or arrow keys; optional info panel (date, camera, location, people, albums, tags, folder) that links to those pages
