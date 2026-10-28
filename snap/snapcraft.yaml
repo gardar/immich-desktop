@@ -67,6 +67,7 @@ parts:
     cmake-parameters:
       - -DCMAKE_BUILD_TYPE=Release
       - -DCMAKE_INSTALL_PREFIX=/usr
+      - -DIMMICH_ENABLE_UPDATER=OFF
       - -GNinja
     parse-info:
       - usr/share/metainfo/immich-desktop.metainfo.xml

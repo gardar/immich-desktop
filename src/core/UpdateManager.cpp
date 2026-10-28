@@ -19,6 +19,7 @@
 #include <QRegularExpression>
 #include <QSaveFile>
 #include <QStandardPaths>
+#include <QSysInfo>
 #include <QTimer>
 #include <QVersionNumber>
 
@@ -38,6 +39,54 @@ bool isNewerVersion(const QString &candidate, const QString &current)
     const auto left = QVersionNumber::fromString(stripVersionPrefix(candidate));
     const auto right = QVersionNumber::fromString(stripVersionPrefix(current));
     return left > right;
+}
+
+QStringList localArchTokens()
+{
+    const QString arch = QSysInfo::currentCpuArchitecture().toLower();
+    if (arch == u"x86_64" || arch == u"x86-64" || arch == u"amd64")
+        return {QStringLiteral("x86_64"), QStringLiteral("amd64"), QStringLiteral("x64"),
+                QStringLiteral("win64"), QStringLiteral("windows-amd64")};
+    if (arch == u"arm64" || arch == u"aarch64")
+        return {QStringLiteral("arm64"), QStringLiteral("aarch64")};
+    if (arch == u"i386" || arch == u"i686" || arch == u"x86")
+        return {QStringLiteral("i386"), QStringLiteral("i686"), QStringLiteral("x86"),
+                QStringLiteral("win32")};
+    return {arch};
+}
+
+QStringList foreignArchTokens()
+{
+    const QStringList local = localArchTokens();
+    QStringList all = {QStringLiteral("x86_64"), QStringLiteral("amd64"), QStringLiteral("x64"),
+                       QStringLiteral("win64"),  QStringLiteral("windows-amd64"),
+                       QStringLiteral("arm64"),  QStringLiteral("aarch64"),
+                       QStringLiteral("i386"),   QStringLiteral("i686"),
+                       QStringLiteral("win32")};
+    all.removeIf([&](const QString &token) { return local.contains(token); });
+    return all;
+}
+
+// 2 = name clearly matches this CPU, 1 = no arch hint, 0 = other arch (reject).
+int architectureScore(const QString &assetName)
+{
+    const QString name = assetName.toLower();
+    for (const QString &token : foreignArchTokens()) {
+        if (name.contains(token))
+            return 0;
+    }
+    for (const QString &token : localArchTokens()) {
+        if (name.contains(token))
+            return 2;
+    }
+    return 1;
+}
+
+bool isTrustedDownloadHost(const QString &host)
+{
+    const QString h = host.toLower();
+    return h == u"github.com" || h.endsWith(u".github.com") ||
+           h == u"githubusercontent.com" || h.endsWith(u".githubusercontent.com");
 }
 
 } // namespace
@@ -207,7 +256,8 @@ void UpdateManager::downloadUpdate()
                           .arg(QString::fromLatin1(Config::ApplicationVersion)));
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                          QNetworkRequest::NoLessSafeRedirectPolicy);
-    request.setTransferTimeout(30000);
+    // Installers are tens of MB; a 30s cap aborted almost every download.
+    request.setTransferTimeout(0);
 
     if (m_activeReply) {
         m_activeReply->abort();
@@ -441,37 +491,28 @@ bool UpdateManager::parseReleasePayload(const QByteArray &payload, UpdateInfo *i
 
     const auto assets = root.value(QStringLiteral("assets")).toArray();
 
-    QJsonObject chosen;
-    for (const auto &value : assets) {
-        const auto asset = value.toObject();
-        const QString name = asset.value(QStringLiteral("name")).toString();
-        if (assetMatches(name, preferred)) {
-            chosen = asset;
-            break;
-        }
-    }
-
-    if (chosen.isEmpty() && preferred == InstallKind::WindowsExe) {
+    auto pickBest = [&](InstallKind kind) -> QJsonObject {
+        QJsonObject best;
+        int bestScore = -1;
         for (const auto &value : assets) {
             const auto asset = value.toObject();
-            if (assetMatches(asset.value(QStringLiteral("name")).toString(),
-                             InstallKind::WindowsMsi)) {
-                chosen = asset;
-                break;
-            }
+            const QString name = asset.value(QStringLiteral("name")).toString();
+            if (!assetMatches(name, kind))
+                continue;
+            const int score = architectureScore(name);
+            if (score <= 0 || score < bestScore)
+                continue;
+            best = asset;
+            bestScore = score;
         }
-    }
+        return best;
+    };
 
-    if (chosen.isEmpty() && preferred == InstallKind::LinuxDeb) {
-        for (const auto &value : assets) {
-            const auto asset = value.toObject();
-            if (assetMatches(asset.value(QStringLiteral("name")).toString(),
-                             InstallKind::LinuxAppImage)) {
-                chosen = asset;
-                break;
-            }
-        }
-    }
+    QJsonObject chosen = pickBest(preferred);
+    if (chosen.isEmpty() && preferred == InstallKind::WindowsExe)
+        chosen = pickBest(InstallKind::WindowsMsi);
+    if (chosen.isEmpty() && preferred == InstallKind::LinuxDeb)
+        chosen = pickBest(InstallKind::LinuxAppImage);
 
     if (chosen.isEmpty()) {
         *error = tr("No compatible installer was published for this platform.");
@@ -500,8 +541,7 @@ bool UpdateManager::parseReleasePayload(const QByteArray &payload, UpdateInfo *i
     }
     if (!info->downloadUrl.isValid() ||
         info->downloadUrl.scheme() != QStringLiteral("https") ||
-        info->downloadUrl.host().compare(QStringLiteral("github.com"),
-                                         Qt::CaseInsensitive) != 0 ||
+        !isTrustedDownloadHost(info->downloadUrl.host()) ||
         !info->downloadUrl.userName().isEmpty() ||
         !info->downloadUrl.password().isEmpty()) {
         *error = tr("The selected update package has an untrusted download URL.");

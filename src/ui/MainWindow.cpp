@@ -482,7 +482,7 @@ void MainWindow::selectPage(int index)
 
 void MainWindow::scheduleStartupUpdateCheck()
 {
-    if (m_autoCheckScheduled || !m_updateManager->settings().autoCheck)
+    if (m_autoCheckScheduled || !m_updateManager->shouldAutoCheck())
         return;
     m_autoCheckScheduled = true;
     QTimer::singleShot(2500, this, [this] {
