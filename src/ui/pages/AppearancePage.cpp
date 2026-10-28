@@ -2,6 +2,7 @@
 
 #include "core/AppSettings.h"
 #include "core/AutoStart.h"
+#include "core/ImmichClient.h"
 #include "core/Localization.h"
 #include "core/ThemeManager.h"
 #include "ui/pages/LibraryPage.h"
@@ -15,6 +16,7 @@
 #include <QFileInfo>
 #include <QFrame>
 #include <QGridLayout>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QMessageBox>
 #include <QPushButton>
@@ -83,13 +85,16 @@ QString formatBytes(qint64 bytes)
 
 } // namespace
 
-AppearancePage::AppearancePage(ThemeManager *themeManager, QWidget *parent)
+AppearancePage::AppearancePage(ThemeManager *themeManager, ImmichClient *client, QWidget *parent)
     : QWidget(parent)
     , m_themeManager(themeManager)
+    , m_client(client)
     , m_themeCombo(new NoWheelComboBox(this))
     , m_closeToTray(new QCheckBox(tr("Close to system tray"), this))
     , m_autoStart(new QCheckBox(tr("Start immich when I sign in"), this))
     , m_cacheSizeLabel(new QLabel(this))
+    , m_prefetchStatus(new QLabel(this))
+    , m_prefetchButton(new QPushButton(tr("Download all thumbnails"), this))
 {
     auto *root = new QVBoxLayout(this);
     root->setContentsMargins(4, 6, 4, 4);
@@ -277,8 +282,21 @@ AppearancePage::AppearancePage(ThemeManager *themeManager, QWidget *parent)
     auto *refreshCache = new QPushButton(tr("Refresh"), cacheCard);
     refreshCache->setCursor(Qt::PointingHandCursor);
     configureActionButton(refreshCache, QStringLiteral(":/icons/refresh-cw.svg"));
+    m_prefetchButton->setCursor(Qt::PointingHandCursor);
+    configureActionButton(m_prefetchButton, QStringLiteral(":/icons/download.svg"));
+    m_prefetchButton->setToolTip(
+        tr("Fetch every library thumbnail into the local cache for faster browsing offline."));
+    m_prefetchStatus->setProperty("subheading", true);
+    m_prefetchStatus->setWordWrap(true);
+    m_prefetchStatus->hide();
+    auto *cacheButtons = new QHBoxLayout;
+    cacheButtons->setSpacing(8);
+    cacheButtons->addWidget(refreshCache, 0, Qt::AlignLeft);
+    cacheButtons->addWidget(m_prefetchButton, 0, Qt::AlignLeft);
+    cacheButtons->addStretch();
     cacheLayout->addWidget(m_cacheSizeLabel);
-    cacheLayout->addWidget(refreshCache, 0, Qt::AlignLeft);
+    cacheLayout->addLayout(cacheButtons);
+    cacheLayout->addWidget(m_prefetchStatus);
     contentRoot->addWidget(cacheCard);
 
     contentRoot->addStretch();
@@ -301,10 +319,50 @@ AppearancePage::AppearancePage(ThemeManager *themeManager, QWidget *parent)
     connect(m_hoverPreview, &QCheckBox::toggled, this, &AppearancePage::saveHoverPreview);
     connect(m_compactGrid, &QCheckBox::toggled, this, &AppearancePage::saveCompactGrid);
     connect(refreshCache, &QPushButton::clicked, this, &AppearancePage::refreshCacheSize);
+    connect(m_prefetchButton, &QPushButton::clicked, this, &AppearancePage::startThumbnailPrefetch);
+    if (m_client) {
+        connect(m_client, &ImmichClient::thumbnailPrefetchProgress, this,
+                [this](int done, int total, int downloading) {
+                    m_prefetchStatus->setVisible(true);
+                    m_prefetchStatus->setText(
+                        tr("Downloading thumbnails… %1 / %2 (%3 in flight)")
+                            .arg(done)
+                            .arg(total)
+                            .arg(downloading));
+                });
+        connect(m_client, &ImmichClient::thumbnailPrefetchFinished, this,
+                [this](int downloaded, int alreadyCached) {
+                    m_prefetchButton->setEnabled(true);
+                    m_prefetchButton->setText(tr("Download all thumbnails"));
+                    m_prefetchStatus->setVisible(true);
+                    m_prefetchStatus->setText(
+                        tr("Finished: %n new thumbnail(s) downloaded, %1 already cached.",
+                           nullptr, downloaded)
+                            .arg(alreadyCached));
+                    refreshCacheSize();
+                });
+        connect(m_client, &ImmichClient::configurationChanged, this, [this](bool configured) {
+            m_prefetchButton->setEnabled(configured && !m_client->isPrefetchingThumbnails());
+        });
+        m_prefetchButton->setEnabled(m_client->isConfigured());
+    } else {
+        m_prefetchButton->setEnabled(false);
+    }
     connect(m_themeManager, &ThemeManager::appearanceChanged, this,
             [this] { syncControls(); });
     syncControls();
     refreshCacheSize();
+}
+
+void AppearancePage::startThumbnailPrefetch()
+{
+    if (!m_client || m_client->isPrefetchingThumbnails())
+        return;
+    m_prefetchButton->setEnabled(false);
+    m_prefetchButton->setText(tr("Downloading…"));
+    m_prefetchStatus->setVisible(true);
+    m_prefetchStatus->setText(tr("Listing library…"));
+    m_client->prefetchAllThumbnails();
 }
 
 void AppearancePage::showEvent(QShowEvent *event)

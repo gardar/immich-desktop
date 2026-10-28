@@ -74,6 +74,10 @@ public:
     enum class FetchPriority { Normal, OnScreen };
     void loadThumbnail(const QString &assetId, ImageSource source = ImageSource::CacheOrServer,
                        FetchPriority priority = FetchPriority::Normal);
+    // Walk the library and download any thumbnails missing from the disk cache.
+    void prefetchAllThumbnails();
+    void cancelThumbnailPrefetch();
+    bool isPrefetchingThumbnails() const;
     void loadPreview(const QString &assetId);
     // Emits thumbnailLoaded with an image of up to maximumDimension pixels,
     // decoded from the preview when the thumbnail is too small.
@@ -129,6 +133,9 @@ signals:
     void filteredAssetsLoaded(const QString &filterKind, const QString &filterValue,
                               const QList<Aurora::ImmichAsset> &assets, const QString &nextPage);
     void thumbnailLoaded(const QString &assetId, const QPixmap &thumbnail);
+    // done = finished downloads + skips so far; total = assets seen while listing.
+    void thumbnailPrefetchProgress(int done, int total, int downloading);
+    void thumbnailPrefetchFinished(int downloaded, int alreadyCached);
     void previewLoaded(const QString &assetId, const QPixmap &preview);
     void personThumbnailLoaded(const QString &personId, const QPixmap &thumbnail);
     void imageLoadFailed(const QString &assetId, const QString &resultSize,
@@ -176,6 +183,10 @@ private:
     void loadImageAsync(const QString &assetId, const QString &resultSize,
                         ImageSource source = ImageSource::CacheOrServer,
                         FetchPriority fetchPriority = FetchPriority::Normal);
+    void prefetchLibraryPage(int page);
+    void queuePrefetchThumbnail(const QString &assetId);
+    void notePrefetchThumbnailDone(const QString &assetId, bool downloaded);
+    void emitPrefetchProgress();
     void finishExploreLoad(bool peopleDone, bool exploreDone, const QString &error);
     bool emitCachedLibrary(const QString &query);
     bool emitCachedExplore();
@@ -247,6 +258,12 @@ private:
     bool m_explorePeoplePending = false;
     bool m_exploreDataPending = false;
     QString m_exploreError;
+    bool m_prefetchActive = false;
+    bool m_prefetchListingDone = false;
+    int m_prefetchTotal = 0;
+    int m_prefetchDownloaded = 0;
+    int m_prefetchSkipped = 0;
+    QSet<QString> m_prefetchPending;
 };
 
 } // namespace Aurora

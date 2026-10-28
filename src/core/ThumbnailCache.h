@@ -21,6 +21,7 @@ public:
 
     QPixmap memoryPixmap(const QString &assetId) const;
     QByteArray readDisk(const QString &assetId) const;
+    bool hasDisk(const QString &assetId) const;
     void store(const QString &assetId, const QByteArray &bytes, const QPixmap &pixmap);
     void clearMemory();
 

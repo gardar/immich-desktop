@@ -5,17 +5,19 @@
 class QCheckBox;
 class QComboBox;
 class QLabel;
+class QPushButton;
 class QShowEvent;
 
 namespace Aurora {
 
+class ImmichClient;
 class ThemeManager;
 
 class AppearancePage final : public QWidget {
     Q_OBJECT
 
 public:
-    explicit AppearancePage(ThemeManager *themeManager, QWidget *parent = nullptr);
+    AppearancePage(ThemeManager *themeManager, ImmichClient *client, QWidget *parent = nullptr);
 
 signals:
     void languageChangeRequested(const QString &language);
@@ -26,12 +28,14 @@ protected:
 private:
     void syncControls();
     void refreshCacheSize();
+    void startThumbnailPrefetch();
     void saveCloseToTray(bool enabled);
     void saveAutoStart(bool enabled);
     void saveHoverPreview(bool enabled);
     void saveCompactGrid(bool enabled);
 
     ThemeManager *m_themeManager;
+    ImmichClient *m_client = nullptr;
     QComboBox *m_themeCombo;
     QComboBox *m_iconPackCombo = nullptr;
     QCheckBox *m_minimalistUi = nullptr;
@@ -41,6 +45,8 @@ private:
     QCheckBox *m_hoverPreview = nullptr;
     QCheckBox *m_compactGrid;
     QLabel *m_cacheSizeLabel;
+    QLabel *m_prefetchStatus = nullptr;
+    QPushButton *m_prefetchButton = nullptr;
 };
 
 } // namespace Aurora

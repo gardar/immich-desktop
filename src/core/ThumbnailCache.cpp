@@ -54,6 +54,12 @@ QByteArray ThumbnailCache::readDisk(const QString &assetId) const
     return file.readAll();
 }
 
+bool ThumbnailCache::hasDisk(const QString &assetId) const
+{
+    QMutexLocker lock(&m_diskMutex);
+    return QFileInfo::exists(filePath(assetId));
+}
+
 void ThumbnailCache::store(const QString &assetId, const QByteArray &bytes,
                            const QPixmap &pixmap)
 {

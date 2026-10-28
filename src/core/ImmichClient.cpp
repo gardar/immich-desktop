@@ -420,6 +420,7 @@ void ImmichClient::setConnection(const ImmichConnectionSettings &connection, boo
     }
 
     if (changed) {
+        cancelThumbnailPrefetch();
         m_currentUserId.clear();
         releaseMemoryCaches();
         if (m_streamServer)
@@ -1374,10 +1375,149 @@ void ImmichClient::loadThumbnail(const QString &assetId, ImageSource source,
 
     if (const QPixmap cached = m_thumbnailCache.memoryPixmap(assetId); !cached.isNull()) {
         emit thumbnailLoaded(assetId, cached);
+        notePrefetchThumbnailDone(assetId, false);
         return;
     }
 
     loadImageAsync(assetId, QStringLiteral("thumbnail"), source, priority);
+}
+
+void ImmichClient::prefetchAllThumbnails()
+{
+    if (m_prefetchActive || !ensureConfigured(tr("Download thumbnails")))
+        return;
+
+    m_prefetchActive = true;
+    m_prefetchListingDone = false;
+    m_prefetchTotal = 0;
+    m_prefetchDownloaded = 0;
+    m_prefetchSkipped = 0;
+    m_prefetchPending.clear();
+    emitPrefetchProgress();
+    prefetchLibraryPage(1);
+}
+
+void ImmichClient::cancelThumbnailPrefetch()
+{
+    if (!m_prefetchActive)
+        return;
+    m_prefetchActive = false;
+    m_prefetchListingDone = true;
+    m_prefetchPending.clear();
+    emit thumbnailPrefetchFinished(m_prefetchDownloaded, m_prefetchSkipped);
+}
+
+bool ImmichClient::isPrefetchingThumbnails() const
+{
+    return m_prefetchActive;
+}
+
+void ImmichClient::prefetchLibraryPage(int page)
+{
+    if (!m_prefetchActive)
+        return;
+
+    if (!m_online) {
+        QList<ImmichAsset> cached;
+        if (m_offlineStore.loadLibrary(m_connection.serverUrl, &cached)) {
+            for (const ImmichAsset &asset : cached)
+                queuePrefetchThumbnail(asset.id);
+        }
+        m_prefetchListingDone = true;
+        emitPrefetchProgress();
+        if (m_prefetchPending.isEmpty()) {
+            m_prefetchActive = false;
+            emit thumbnailPrefetchFinished(m_prefetchDownloaded, m_prefetchSkipped);
+        }
+        return;
+    }
+
+    QJsonObject body;
+    body.insert(QStringLiteral("visibility"), QStringLiteral("timeline"));
+    body.insert(QStringLiteral("page"), qMax(1, page));
+    body.insert(QStringLiteral("size"), 250);
+    body.insert(QStringLiteral("order"), QStringLiteral("desc"));
+    body.insert(QStringLiteral("withExif"), false);
+    body.insert(QStringLiteral("withStacked"), true);
+
+    QNetworkRequest request = authenticatedRequest(apiUrl(QStringLiteral("/search/metadata")));
+    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+    request.setRawHeader("Accept", "application/json");
+    request.setTransferTimeout(30000);
+    auto *reply = m_network->post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
+    connect(reply, &QNetworkReply::finished, this, [this, reply, page] {
+        const QByteArray body = reply->readAll();
+        if (!m_prefetchActive) {
+            reply->deleteLater();
+            return;
+        }
+        if (reply->error() != QNetworkReply::NoError) {
+            reply->deleteLater();
+            m_prefetchListingDone = true;
+            emitPrefetchProgress();
+            if (m_prefetchPending.isEmpty()) {
+                m_prefetchActive = false;
+                emit thumbnailPrefetchFinished(m_prefetchDownloaded, m_prefetchSkipped);
+                emit requestFailed(tr("Download thumbnails"), errorMessage(reply, body));
+            }
+            return;
+        }
+
+        setOnline(true);
+        QString nextPage;
+        const QList<ImmichAsset> assets = assetsFromSearchBody(body, &nextPage);
+        for (const ImmichAsset &asset : assets)
+            queuePrefetchThumbnail(asset.id);
+        emitPrefetchProgress();
+        reply->deleteLater();
+
+        bool ok = false;
+        const int next = nextPage.toInt(&ok);
+        if (ok && next > page) {
+            prefetchLibraryPage(next);
+            return;
+        }
+
+        m_prefetchListingDone = true;
+        if (m_prefetchPending.isEmpty()) {
+            m_prefetchActive = false;
+            emit thumbnailPrefetchFinished(m_prefetchDownloaded, m_prefetchSkipped);
+        }
+    });
+}
+
+void ImmichClient::queuePrefetchThumbnail(const QString &assetId)
+{
+    if (!m_prefetchActive || assetId.isEmpty() || m_prefetchPending.contains(assetId))
+        return;
+    ++m_prefetchTotal;
+    if (m_thumbnailCache.hasDisk(assetId)) {
+        ++m_prefetchSkipped;
+        return;
+    }
+    m_prefetchPending.insert(assetId);
+    loadThumbnail(assetId, ImageSource::CacheOrServer, FetchPriority::Normal);
+}
+
+void ImmichClient::notePrefetchThumbnailDone(const QString &assetId, bool downloaded)
+{
+    if (!m_prefetchPending.remove(assetId))
+        return;
+    if (downloaded)
+        ++m_prefetchDownloaded;
+    else
+        ++m_prefetchSkipped;
+    emitPrefetchProgress();
+    if (m_prefetchActive && m_prefetchListingDone && m_prefetchPending.isEmpty()) {
+        m_prefetchActive = false;
+        emit thumbnailPrefetchFinished(m_prefetchDownloaded, m_prefetchSkipped);
+    }
+}
+
+void ImmichClient::emitPrefetchProgress()
+{
+    emit thumbnailPrefetchProgress(m_prefetchDownloaded + m_prefetchSkipped, m_prefetchTotal,
+                                   m_prefetchPending.size());
 }
 
 void ImmichClient::loadPreview(const QString &assetId)
@@ -2207,6 +2347,8 @@ void ImmichClient::loadImageAsync(const QString &assetId, const QString &resultS
                 if (!self)
                     return;
                 self->m_pendingImages.remove(pendingKey);
+                if (resultSize == QStringLiteral("thumbnail"))
+                    self->notePrefetchThumbnailDone(assetId, false);
                 emit self->imageLoadFailed(assetId, resultSize, message);
                 emit self->requestFailed(ImmichClient::tr("Load image"), message);
             }, Qt::QueuedConnection);
@@ -2242,6 +2384,7 @@ void ImmichClient::loadImageAsync(const QString &assetId, const QString &resultS
                     if (resultSize == QStringLiteral("thumbnail")) {
                         self->m_thumbnailCache.store(assetId, cacheBytes, pixmap);
                         emit self->thumbnailLoaded(assetId, pixmap);
+                        self->notePrefetchThumbnailDone(assetId, true);
                     } else if (resultSize.startsWith(QStringLiteral("tile:"))) {
                         self->m_previewCache.store(assetId, cacheBytes, pixmap);
                         emit self->thumbnailLoaded(assetId, pixmap);
