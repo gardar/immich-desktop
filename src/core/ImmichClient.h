@@ -17,6 +17,7 @@
 #include <QSslConfiguration>
 #include <QStringList>
 #include <QThreadPool>
+#include <QVersionNumber>
 #include <QUrl>
 #include <QUuid>
 
@@ -46,23 +47,46 @@ public:
     QString activeServerUrl() const;
     bool usingLocalEndpoint() const;
     bool isOnline() const;
+    // False until the server's version is known.
+    bool serverAtLeast(int major, int minor) const;
     bool isOffline() const { return !isOnline(); }
 
     void testConnection();
     void loadAssets(int page = 1, int pageSize = 80, const QString &query = {},
                     const QJsonObject &searchOptions = {});
-    void loadTimelineBuckets();
-    void loadTimelineBucket(const QDate &month);
+    void loadTimelineBuckets(const AssetSort &sort = {});
+    void loadTimelineBucket(const QDate &month, const AssetSort &sort = {});
     void clearCachedLibrary();
     void pollNewestAssets(int pageSize = 20);
     bool loadExplore();
-    void loadAssetsForPerson(const QString &personId, int page = 1, int pageSize = 80);
-    void loadAssetsForCity(const QString &city, int page = 1, int pageSize = 80);
-    void loadAssetsForAlbum(const QString &albumId, int page = 1, int pageSize = 80);
-    void loadAssetsForTag(const QString &tagId, int page = 1, int pageSize = 80);
-    void loadAssetsForFolder(const QString &path);
+    void loadAssetsForFolder(const QString &path, const AssetSort &sort = {});
     // kind: person, city, album, tag, folder, favorites, archive or trash.
-    void loadCollectionAssets(const QString &kind, const QString &value, int page = 1);
+    // Pages are opaque: pass back the nextPage that filteredAssetsLoaded reported.
+    void loadCollectionAssets(const QString &kind, const QString &value, int page = 1,
+                              const AssetSort &sort = {});
+    // The order fields for a /search/metadata body. Size and rating use Immich
+    // 3.2's orderBy; dates use the older order field every server understands.
+    static QJsonObject searchOrder(const AssetSort &sort);
+    // Collections that can be ordered by date added (via the timeline).
+    static bool canSortByDateAdded(const QString &kind);
+    // A random batch from a collection ("library" for the whole timeline), for
+    // Shuffle. Replies with randomAssetsLoaded; folders and the view history come
+    // whole, so they have no more to give.
+    void loadRandomAssets(const QString &kind, const QString &value);
+    // Photos opened in the viewer, kept on this computer only (Immich doesn't
+    // record views). Most recent first; also the "viewed" collection.
+    void recordViewed(const ImmichAsset &asset);
+    QList<ImmichAsset> recentlyViewed() const;
+    void clearRecentlyViewed();
+    // "Last viewed" order for the Library: viewed photos first, then the rest by
+    // date taken. Replies with assetsLoaded, like a library page.
+    void loadLibraryViewedFirst(int page, const AssetSort &sort);
+    // Off pauses recording and hides the list; what's stored stays until cleared.
+    void setRememberViewed(bool remember);
+    // Kept in memory: grids ask for every photo they add, and reading settings is slow.
+    bool remembersViewed() const { return m_rememberViewed; }
+    // Saves an album's own newest/oldest-first order in Immich (album.update).
+    void setAlbumOrder(const QString &albumId, bool ascending);
     void loadAlbums();
     void loadTags();
     void loadFolderPaths();
@@ -113,14 +137,24 @@ public slots:
 
 signals:
     void configurationChanged(bool configured);
+    void serverVersionChanged();
+    void recentlyViewedChanged();
+    void randomAssetsLoaded(const QString &kind, const QString &value,
+                            const QList<Aurora::ImmichAsset> &assets, bool more);
+    void albumOrderSaved(const QString &albumId, bool ascending);
+    void albumOrderFailed(const QString &albumId, const QString &message);
     void activeEndpointChanged(bool usingLocal, const QString &activeUrl);
     void onlineChanged(bool online);
     void connectionTested(bool success, const QString &message);
     void assetsLoaded(const QList<Aurora::ImmichAsset> &assets, const QString &nextPage,
                       const QString &query, bool fromCache = false);
-    void timelineBucketsLoaded(const QList<Aurora::TimeBucketInfo> &buckets);
-    void timelineBucketLoaded(const QDate &month, const QList<Aurora::ImmichAsset> &assets);
-    void timelineBucketFailed(const QDate &month, const QString &message);
+    // The sort is the one requested, so callers can drop results of an older sort.
+    void timelineBucketsLoaded(const QList<Aurora::TimeBucketInfo> &buckets,
+                               const Aurora::AssetSort &sort);
+    void timelineBucketLoaded(const QDate &month, const QList<Aurora::ImmichAsset> &assets,
+                              const Aurora::AssetSort &sort);
+    void timelineBucketFailed(const QDate &month, const QString &message,
+                              const Aurora::AssetSort &sort);
     void newestAssetsPolled(const QList<Aurora::ImmichAsset> &assets);
     void exploreLoaded(const Aurora::ImmichExploreData &data, bool fromCache = false);
     void albumsLoaded(const QList<Aurora::ImmichAlbum> &albums);
@@ -131,7 +165,8 @@ signals:
     // kind is "albums", "tags" or "folders" for the lists, "folder" for one folder's photos.
     void browseListFailed(const QString &kind, bool permissionDenied);
     void filteredAssetsLoaded(const QString &filterKind, const QString &filterValue,
-                              const QList<Aurora::ImmichAsset> &assets, const QString &nextPage);
+                              const QList<Aurora::ImmichAsset> &assets, const QString &nextPage,
+                              const Aurora::AssetSort &sort);
     void thumbnailLoaded(const QString &assetId, const QPixmap &thumbnail);
     // done = finished downloads + skips so far; total = assets seen while listing.
     void thumbnailPrefetchProgress(int done, int total, int downloading);
@@ -168,6 +203,7 @@ signals:
     void sslPasswordNeeded();
 
 private:
+    void loadServerVersion();
     static QString normalizeServerUrl(QString url);
     static QUrl apiUrlForBase(const QString &serverUrl, const QString &path);
     static bool isTransientNetworkError(QNetworkReply *reply);
@@ -179,7 +215,16 @@ private:
     void searchAssets(int page, int pageSize, bool pollOnly, const QString &query = {},
                       const QJsonObject &searchOptions = {});
     void searchFilteredAssets(const QString &filterKind, const QString &filterValue,
-                              int page, int pageSize);
+                              int page, int pageSize, const AssetSort &sort);
+    void searchAllPages(const QJsonObject &filter,
+                        std::function<void(const QList<ImmichAsset> &)> done);
+    void loadAlbumByActivity(const QString &albumId, const AssetSort &sort);
+    void loadTrashByDeletion(const AssetSort &sort);
+    void searchViewedFirst(const QJsonObject &flatFilter, int page, const AssetSort &sort,
+                           std::function<void(const QList<ImmichAsset> &, const QString &)> done);
+    void loadCollectionTimeline(const QString &kind, const QString &value, int page,
+                                const AssetSort &sort);
+    void loadCollectionTimelinePage(int firstBucket);
     void loadImageAsync(const QString &assetId, const QString &resultSize,
                         ImageSource source = ImageSource::CacheOrServer,
                         FetchPriority fetchPriority = FetchPriority::Normal);
@@ -248,6 +293,20 @@ private:
     bool m_online = false;
     bool m_pollInFlight = false;
     quint64 m_searchGeneration = 0;
+    QVersionNumber m_serverVersion;
+    bool m_rememberViewed = true;
+    quint64 m_collectionGeneration = 0; // Bumped when a collection starts loading.
+    // Next-page cursors for size/rating searches ("library", "collection"); both
+    // views request pages one after another, so the latest cursor is the next.
+    QHash<QString, QString> m_searchCursors;
+    // The collection being loaded month by month for a date-added sort.
+    struct CollectionTimeline {
+        QString kind;
+        QString value;
+        AssetSort sort;
+        QList<TimeBucketInfo> buckets;
+        quint64 generation = 0;
+    } m_collectionTimeline;
     bool m_uploadInFlight = false;
     bool m_processingUploadQueue = false;
     bool m_uploadRetryScheduled = false;

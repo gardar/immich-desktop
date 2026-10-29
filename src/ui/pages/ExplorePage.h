@@ -34,6 +34,7 @@ class ThemeManager;
 class MediaTile;
 class MediaViewerDialog;
 class VideoHoverPreview;
+class SortButton;
 class TileImageScheduler;
 class ZoomSlider;
 
@@ -83,6 +84,8 @@ signals:
     void albumRequested(const Aurora::ImmichAlbum &album);
     void tagRequested(const Aurora::ImmichTag &tag);
     void folderRequested(const QString &path, const QString &title);
+    // Show everything recently added: the Library, sorted by date added.
+    void recentlyAddedRequested();
 
     void sectionShown(Aurora::BrowseSection section, const QString &itemValue,
                       const QString &title);
@@ -108,7 +111,8 @@ private slots:
     void refresh();
     void showExplore(const Aurora::ImmichExploreData &data, bool fromCache);
     void showFilteredAssets(const QString &filterKind, const QString &filterValue,
-                            const QList<Aurora::ImmichAsset> &assets, const QString &nextPage);
+                            const QList<Aurora::ImmichAsset> &assets, const QString &nextPage,
+                            const Aurora::AssetSort &sort);
     void showPersonThumbnail(const QString &personId, const QPixmap &thumbnail);
     void showAssetThumbnail(const QString &assetId, const QPixmap &thumbnail);
     void showRequestError(const QString &operation, const QString &message);
@@ -131,7 +135,7 @@ private:
     };
 
     struct SectionRow {
-        QLabel *header = nullptr;
+        QWidget *header = nullptr; // Title row, with room for a link like View all.
         QScrollArea *scroll = nullptr;
         QWidget *host = nullptr;
         QList<ExploreCard *> cards;
@@ -150,6 +154,16 @@ private:
     void setCrumbs(const QList<Crumb> &crumbs, const QString &title);
     void setChips(const QList<Crumb> &chips, const QString &iconResource);
     QList<Crumb> folderChildren(const QString &path);
+    // The open collection's sort, limited to what it offers.
+    AssetSort effectiveCollectionSort() const;
+    QList<AssetSort::Field> collectionSortFields() const;
+    QString collectionSortKey() const;
+    void loadCollectionSort();
+    void chooseCollectionSort(const AssetSort &sort);
+    void shuffleCollection();
+    void showRandomAssets(const QString &kind, const QString &value,
+                          const QList<Aurora::ImmichAsset> &assets, bool more);
+    void reloadCollection();
     void openCollection(const QString &kind, const QString &value, const QString &title,
                         BrowseSection section);
     void clearSections();
@@ -161,9 +175,13 @@ private:
     void clearCollectionTimeline();
     void appendCollectionAssets(const QList<ImmichAsset> &assets);
     void updateCollectionLoadMore(const QString &nextPage);
-    ImmichAsset adjacentAsset(bool fromCollection, const QString &assetId, int step);
+    // Where the viewer was opened from, so it steps through the same list.
+    enum class AssetSource { Collection, RecentlyAdded, RecentlyViewed };
+    ImmichAsset adjacentAsset(AssetSource source, const QString &assetId, int step);
     void setPage(Page page);
-    MediaViewerDialog *openAsset(const Aurora::ImmichAsset &asset, bool fromCollection);
+    MediaViewerDialog *openAsset(const Aurora::ImmichAsset &asset, AssetSource source);
+    void populateViewedRow();
+    void showRecentlyViewed();
     void setCollectionTileSize(int size);
     void applyIndexZoom();
     void clearTrashView();
@@ -190,6 +208,8 @@ private:
     SectionRow m_peopleSection;
     SectionRow m_placesSection;
     SectionRow m_recentSection;
+    SectionRow m_viewedSection;
+    QList<ImmichAsset> m_viewedAssets;
     QHash<QString, ExploreCard *> m_personCards;
     QMultiHash<QString, ExploreCard *> m_browseAssetCards;
     QList<ImmichAsset> m_recentAssets;
@@ -246,6 +266,11 @@ private:
     bool m_collectionCompactGrid = false;
     int m_collectionTileSize = 180;
     ZoomSlider *m_collectionZoomSlider = nullptr;
+    SortButton *m_collectionSortButton = nullptr;
+    QPushButton *m_collectionShuffleButton = nullptr;
+    bool m_collectionShuffled = false;
+    AssetSort m_collectionSort;
+    ImmichAlbum m_collectionAlbum; // The open album, for its order and activity.
     QPushButton *m_restoreAllButton = nullptr;
     QPushButton *m_emptyTrashButton = nullptr;
     int m_trashDays = 0;

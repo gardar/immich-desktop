@@ -5,6 +5,7 @@
 #include "core/VideoStreamServer.h"
 
 #include <QBuffer>
+#include <QCollator>
 #include <QEventLoop>
 #include <QFile>
 #include <QFileInfo>
@@ -21,6 +22,7 @@
 #include <QNetworkInformation>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QRandomGenerator>
 #include <QPointer>
 #include <QRegularExpression>
 #include <QTimer>
@@ -58,6 +60,15 @@ ImmichAsset assetFromObject(const QJsonObject &object)
     const QString takenAt = object.value(QStringLiteral("localDateTime")).toString(
         object.value(QStringLiteral("fileCreatedAt")).toString());
     asset.takenAt = QDateTime::fromString(takenAt, Qt::ISODate);
+    asset.addedAt =
+        QDateTime::fromString(object.value(QStringLiteral("createdAt")).toString(), Qt::ISODate);
+    asset.updatedAt =
+        QDateTime::fromString(object.value(QStringLiteral("updatedAt")).toString(), Qt::ISODate);
+    asset.modifiedAt = QDateTime::fromString(
+        object.value(QStringLiteral("fileModifiedAt")).toString(), Qt::ISODate);
+    const QJsonObject exif = object.value(QStringLiteral("exifInfo")).toObject();
+    asset.fileSize = qint64(exif.value(QStringLiteral("fileSizeInByte")).toDouble());
+    asset.rating = exif.value(QStringLiteral("rating")).toInt();
     return asset;
 }
 
@@ -141,12 +152,15 @@ ImmichAssetDetails assetDetailsFromObject(const QJsonObject &object)
     return details;
 }
 
-QList<ImmichAsset> assetsFromSearchBody(const QByteArray &body, QString *nextPage)
+QList<ImmichAsset> assetsFromSearchBody(const QByteArray &body, QString *nextPage,
+                                        QString *nextCursor = nullptr)
 {
     const QJsonObject assetsObject =
         QJsonDocument::fromJson(body).object().value(QStringLiteral("assets")).toObject();
     if (nextPage)
         *nextPage = assetsObject.value(QStringLiteral("nextPage")).toVariant().toString();
+    if (nextCursor)
+        *nextCursor = assetsObject.value(QStringLiteral("nextCursor")).toString();
 
     QList<ImmichAsset> assets;
     const QJsonArray items = assetsObject.value(QStringLiteral("items")).toArray();
@@ -161,8 +175,9 @@ QList<ImmichAsset> assetsFromSearchBody(const QByteArray &body, QString *nextPag
 
 // /timeline/bucket returns a "columnar" response (one array per field,
 // parallel-indexed) rather than an array of asset objects, and omits
-// originalFileName entirely.
-QList<ImmichAsset> assetsFromBucketBody(const QByteArray &body)
+// originalFileName entirely. The Library keeps only active timeline assets;
+// collections (archive, trash) keep everything the filter returned.
+QList<ImmichAsset> assetsFromBucketBody(const QByteArray &body, bool timelineOnly = true)
 {
     const QJsonObject root = QJsonDocument::fromJson(body).object();
     const QJsonArray ids = root.value(QStringLiteral("id")).toArray();
@@ -172,6 +187,7 @@ QList<ImmichAsset> assetsFromBucketBody(const QByteArray &body)
     const QJsonArray ratio = root.value(QStringLiteral("ratio")).toArray();
     const QJsonArray duration = root.value(QStringLiteral("duration")).toArray();
     const QJsonArray fileCreatedAt = root.value(QStringLiteral("fileCreatedAt")).toArray();
+    const QJsonArray createdAt = root.value(QStringLiteral("createdAt")).toArray();
     const QJsonArray visibility = root.value(QStringLiteral("visibility")).toArray();
     const QJsonArray status = root.value(QStringLiteral("status")).toArray();
 
@@ -182,13 +198,15 @@ QList<ImmichAsset> assetsFromBucketBody(const QByteArray &body)
     QList<ImmichAsset> assets;
     assets.reserve(ids.size());
     for (int i = 0; i < ids.size(); ++i) {
-        if (at(isTrashed, i).toBool())
-            continue;
-        if (at(status, i).toString(QStringLiteral("active")) != QStringLiteral("active"))
-            continue;
-        if (at(visibility, i).toString(QStringLiteral("timeline")) !=
-            QStringLiteral("timeline"))
-            continue;
+        if (timelineOnly) {
+            if (at(isTrashed, i).toBool())
+                continue;
+            if (at(status, i).toString(QStringLiteral("active")) != QStringLiteral("active"))
+                continue;
+            if (at(visibility, i).toString(QStringLiteral("timeline")) !=
+                QStringLiteral("timeline"))
+                continue;
+        }
 
         ImmichAsset asset;
         asset.id = ids.at(i).toString();
@@ -200,6 +218,7 @@ QList<ImmichAsset> assetsFromBucketBody(const QByteArray &body)
         asset.aspectRatio = qBound(0.2, at(ratio, i).toDouble(1.0), 8.0);
         asset.duration = at(duration, i).toString();
         asset.takenAt = QDateTime::fromString(at(fileCreatedAt, i).toString(), Qt::ISODate);
+        asset.addedAt = QDateTime::fromString(at(createdAt, i).toString(), Qt::ISODate);
         assets.append(asset);
     }
     return assets;
@@ -211,6 +230,164 @@ bool isValidImmichId(const QString &id)
         QStringLiteral("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
                        "[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"));
     return pattern.match(id).hasMatch();
+}
+
+// Months in display order: newest first unless sorting oldest first.
+QList<TimeBucketInfo> bucketsFromBody(const QByteArray &body, const AssetSort &sort)
+{
+    QList<TimeBucketInfo> buckets;
+    const QJsonArray items = QJsonDocument::fromJson(body).array();
+    buckets.reserve(items.size());
+    for (const QJsonValue &value : items) {
+        const QJsonObject object = value.toObject();
+        const QString bucketStr = object.value(QStringLiteral("timeBucket")).toString();
+        const QDate month = QDate::fromString(bucketStr.left(10), Qt::ISODate);
+        const int count = object.value(QStringLiteral("count")).toInt();
+        if (month.isValid() && count > 0)
+            buckets.append({month, count});
+    }
+    std::sort(buckets.begin(), buckets.end(),
+              [ascending = sort.ascending](const TimeBucketInfo &a, const TimeBucketInfo &b) {
+                  return ascending ? a.month < b.month : a.month > b.month;
+              });
+    return buckets;
+}
+
+ImmichAlbum albumFromObject(const QJsonObject &object)
+{
+    ImmichAlbum album;
+    album.id = object.value(QStringLiteral("id")).toString();
+    album.name = object.value(QStringLiteral("albumName")).toString();
+    album.assetCount = object.value(QStringLiteral("assetCount")).toInt();
+    album.thumbnailAssetId = object.value(QStringLiteral("albumThumbnailAssetId")).toString();
+    album.orderAscending = object.value(QStringLiteral("order")).toString() == QStringLiteral("asc");
+    album.activityEnabled = object.value(QStringLiteral("shared")).toBool() &&
+                            object.value(QStringLiteral("isActivityEnabled")).toBool();
+    return album;
+}
+
+// File-manager orders for a folder. Names compare naturally (IMG_2 before
+// IMG_10); ties fall back to the name so the order is stable.
+void sortFolderAssets(QList<ImmichAsset> *assets, const AssetSort &sort)
+{
+    QCollator collator;
+    collator.setNumericMode(true);
+    collator.setCaseSensitivity(Qt::CaseInsensitive);
+    using Field = AssetSort::Field;
+    auto key = [&sort](const ImmichAsset &asset) -> QVariant {
+        switch (sort.field) {
+        case Field::AddedAt: return asset.addedAt;
+        case Field::Modified: return asset.modifiedAt;
+        case Field::Size: return asset.fileSize;
+        case Field::Rating: return asset.rating;
+        case Field::Type: return asset.isVideo() ? 1 : 0;
+        case Field::Name: return {};
+        default: return asset.takenAt;
+        }
+    };
+    std::stable_sort(assets->begin(), assets->end(),
+                     [&](const ImmichAsset &a, const ImmichAsset &b) {
+                         int order = 0;
+                         const QPartialOrdering byKey = QVariant::compare(key(a), key(b));
+                         if (byKey == QPartialOrdering::Less)
+                             order = -1;
+                         else if (byKey == QPartialOrdering::Greater)
+                             order = 1;
+                         if (order == 0)
+                             order = collator.compare(a.fileName, b.fileName);
+                         return sort.ascending ? order < 0 : order > 0;
+                     });
+}
+
+// The timeline's filter for a collection (see searchFilteredAssets for search).
+QUrlQuery collectionTimelineQuery(const QString &kind, const QString &value)
+{
+    QUrlQuery query;
+    if (kind == QStringLiteral("person"))
+        query.addQueryItem(QStringLiteral("personId"), value);
+    else if (kind == QStringLiteral("album"))
+        query.addQueryItem(QStringLiteral("albumId"), value);
+    else if (kind == QStringLiteral("tag"))
+        query.addQueryItem(QStringLiteral("tagId"), value);
+    else if (kind == QStringLiteral("favorites"))
+        query.addQueryItem(QStringLiteral("isFavorite"), QStringLiteral("true"));
+    else if (kind == QStringLiteral("archive"))
+        query.addQueryItem(QStringLiteral("visibility"), QStringLiteral("archive"));
+    else if (kind == QStringLiteral("trash"))
+        query.addQueryItem(QStringLiteral("isTrashed"), QStringLiteral("true"));
+    return query;
+}
+
+// Only non-default sorts add parameters, so servers older than 3.0 (no orderBy)
+// keep working with the default.
+void addSortQuery(QUrlQuery *query, const AssetSort &sort)
+{
+    if (sort.ascending)
+        query->addQueryItem(QStringLiteral("order"), QStringLiteral("asc"));
+    if (sort.field == AssetSort::Field::AddedAt)
+        query->addQueryItem(QStringLiteral("orderBy"), QStringLiteral("createdAt"));
+}
+
+// Immich 3.2's search shape: orderBy (size, rating) only works with a structured
+// filter, and the server rejects mixing it with the older flat fields, so the
+// flat fields this app sends are converted. Pages become a cursor (see
+// m_searchCursors). Unlike the old shape it includes trashed photos unless told.
+QJsonObject toFilterShape(const QJsonObject &flat)
+{
+    QJsonObject body;
+    QJsonObject filter;
+    QJsonObject takenAt;
+    for (auto it = flat.begin(); it != flat.end(); ++it) {
+        const QString &key = it.key();
+        const QJsonValue value = it.value();
+        if (key == QStringLiteral("size") || key == QStringLiteral("withExif") ||
+            key == QStringLiteral("withStacked") || key == QStringLiteral("orderBy"))
+            body.insert(key, value);
+        else if (key == QStringLiteral("visibility") || key == QStringLiteral("city") ||
+                 key == QStringLiteral("type") || key == QStringLiteral("isFavorite"))
+            filter.insert(key, QJsonObject{{QStringLiteral("eq"), value}});
+        else if (key == QStringLiteral("personIds")) // Photos with all of these people.
+            filter.insert(key, QJsonObject{{QStringLiteral("all"), value}});
+        else if (key == QStringLiteral("albumIds") || key == QStringLiteral("tagIds"))
+            filter.insert(key, QJsonObject{{QStringLiteral("any"), value}});
+        else if (key == QStringLiteral("originalFileName") || key == QStringLiteral("description") ||
+                 key == QStringLiteral("originalPath"))
+            filter.insert(key, QJsonObject{{QStringLiteral("like"), value}});
+        else if (key == QStringLiteral("ocr"))
+            filter.insert(key, QJsonObject{{QStringLiteral("matches"), value}});
+        else if (key == QStringLiteral("takenAfter"))
+            takenAt.insert(QStringLiteral("gte"), value);
+        else if (key == QStringLiteral("takenBefore"))
+            takenAt.insert(QStringLiteral("lte"), value);
+    }
+    if (!takenAt.isEmpty())
+        filter.insert(QStringLiteral("takenAt"), takenAt);
+    const bool trash = flat.value(QStringLiteral("withDeleted")).toBool();
+    filter.insert(QStringLiteral("trashedAt"),
+                  QJsonObject{{trash ? QStringLiteral("ne") : QStringLiteral("eq"), QJsonValue::Null}});
+    body.insert(QStringLiteral("filter"), filter);
+    return body;
+}
+
+// The search filter for a collection, or an empty object for unknown kinds.
+QJsonObject collectionSearchFilter(const QString &kind, const QString &value)
+{
+    if (kind == QStringLiteral("person"))
+        return {{QStringLiteral("personIds"), QJsonArray{value}}};
+    if (kind == QStringLiteral("city"))
+        return {{QStringLiteral("city"), value}};
+    if (kind == QStringLiteral("album"))
+        return {{QStringLiteral("albumIds"), QJsonArray{value}}};
+    if (kind == QStringLiteral("tag"))
+        return {{QStringLiteral("tagIds"), QJsonArray{value}}};
+    if (kind == QStringLiteral("favorites"))
+        return {{QStringLiteral("isFavorite"), true}};
+    if (kind == QStringLiteral("archive"))
+        return {{QStringLiteral("visibility"), QStringLiteral("archive")}};
+    if (kind == QStringLiteral("trash"))
+        return {{QStringLiteral("withDeleted"), true},
+                {QStringLiteral("trashedAfter"), QStringLiteral("1970-01-01T00:00:00.000Z")}};
+    return {};
 }
 
 } // namespace
@@ -225,6 +402,7 @@ ImmichClient::ImmichClient(QObject *parent)
     , m_cacheFlushTimer(new QTimer(this))
 {
     m_imagePool.setMaxThreadCount(4);
+    m_rememberViewed = AppSettings().loadTimeline().rememberViewed;
     m_cacheFlushTimer->setSingleShot(true);
     m_cacheFlushTimer->setInterval(2000);
     connect(m_cacheFlushTimer, &QTimer::timeout, this, &ImmichClient::flushLibraryCache);
@@ -246,7 +424,36 @@ ImmichClient::ImmichClient(QObject *parent)
         QTimer::singleShot(0, this, &ImmichClient::probeEndpoints);
         QTimer::singleShot(0, this, &ImmichClient::probeReachability);
         QTimer::singleShot(2000, this, &ImmichClient::processUploadQueue);
+        QTimer::singleShot(0, this, &ImmichClient::loadServerVersion);
     }
+}
+
+bool ImmichClient::serverAtLeast(int major, int minor) const
+{
+    return !m_serverVersion.isNull() &&
+           QVersionNumber::compare(m_serverVersion, QVersionNumber(major, minor)) >= 0;
+}
+
+void ImmichClient::loadServerVersion()
+{
+    if (!isConfigured())
+        return;
+    QNetworkRequest request = authenticatedRequest(apiUrl(QStringLiteral("/server/version")));
+    request.setRawHeader("Accept", "application/json");
+    auto *reply = m_network->get(request);
+    connect(reply, &QNetworkReply::finished, this, [this, reply] {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError)
+            return;
+        const QJsonObject object = QJsonDocument::fromJson(reply->readAll()).object();
+        const QVersionNumber version(object.value(QStringLiteral("major")).toInt(),
+                                     object.value(QStringLiteral("minor")).toInt(),
+                                     object.value(QStringLiteral("patch")).toInt());
+        if (version != m_serverVersion) {
+            m_serverVersion = version;
+            emit serverVersionChanged();
+        }
+    });
 }
 
 ImmichClient::~ImmichClient()
@@ -345,8 +552,11 @@ void ImmichClient::setOnline(bool online)
         return;
     m_online = online;
     emit onlineChanged(m_online);
-    if (m_online)
+    if (m_online) {
         processUploadQueue();
+        if (m_serverVersion.isNull())
+            loadServerVersion();
+    }
 }
 
 bool ImmichClient::isTransientNetworkError(QNetworkReply *reply)
@@ -422,10 +632,13 @@ void ImmichClient::setConnection(const ImmichConnectionSettings &connection, boo
     if (changed) {
         cancelThumbnailPrefetch();
         m_currentUserId.clear();
+        m_serverVersion = {};
+        m_rememberViewed = AppSettings().loadTimeline().rememberViewed;
         releaseMemoryCaches();
         if (m_streamServer)
             ensureStreamServer();
         emit configurationChanged(isConfigured());
+        loadServerVersion();
     }
 }
 
@@ -722,7 +935,7 @@ void ImmichClient::loadAssets(int page, int pageSize, const QString &query,
     searchAssets(page, pageSize, false, query, searchOptions);
 }
 
-void ImmichClient::loadTimelineBuckets()
+void ImmichClient::loadTimelineBuckets(const AssetSort &sort)
 {
     ++m_searchGeneration;
     if (!ensureConfigured(tr("Load library")))
@@ -736,41 +949,30 @@ void ImmichClient::loadTimelineBuckets()
     QUrl url = apiUrl(QStringLiteral("/timeline/buckets"));
     QUrlQuery query;
     query.addQueryItem(QStringLiteral("size"), QStringLiteral("MONTH"));
+    addSortQuery(&query, sort);
     url.setQuery(query);
 
     QNetworkRequest request = authenticatedRequest(url);
     request.setRawHeader("Accept", "application/json");
     auto *reply = m_network->get(request);
-    connect(reply, &QNetworkReply::finished, this, [this, reply] {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, sort] {
         const QByteArray body = reply->readAll();
         if (reply->error() != QNetworkReply::NoError) {
             emit requestFailed(tr("Load library"), errorMessage(reply, body));
             reply->deleteLater();
             return;
         }
-
-        QList<TimeBucketInfo> buckets;
-        const QJsonArray items = QJsonDocument::fromJson(body).array();
-        buckets.reserve(items.size());
-        for (const QJsonValue &value : items) {
-            const QJsonObject object = value.toObject();
-            const QString bucketStr = object.value(QStringLiteral("timeBucket")).toString();
-            const QDate month = QDate::fromString(bucketStr.left(10), Qt::ISODate);
-            const int count = object.value(QStringLiteral("count")).toInt();
-            if (month.isValid() && count > 0)
-                buckets.append({month, count});
-        }
-        emit timelineBucketsLoaded(buckets);
+        emit timelineBucketsLoaded(bucketsFromBody(body, sort), sort);
         reply->deleteLater();
     });
 }
 
-void ImmichClient::loadTimelineBucket(const QDate &month)
+void ImmichClient::loadTimelineBucket(const QDate &month, const AssetSort &sort)
 {
     if (!ensureConfigured(tr("Load library")))
         return;
     if (!m_online) {
-        emit timelineBucketFailed(month, tr("You're offline."));
+        emit timelineBucketFailed(month, tr("You're offline."), sort);
         return;
     }
 
@@ -779,21 +981,22 @@ void ImmichClient::loadTimelineBucket(const QDate &month)
     query.addQueryItem(QStringLiteral("timeBucket"),
                        QDate(month.year(), month.month(), 1).toString(Qt::ISODate));
     query.addQueryItem(QStringLiteral("size"), QStringLiteral("MONTH"));
+    addSortQuery(&query, sort);
     url.setQuery(query);
 
     QNetworkRequest request = authenticatedRequest(url);
     request.setRawHeader("Accept", "application/json");
     auto *reply = m_network->get(request);
-    connect(reply, &QNetworkReply::finished, this, [this, reply, month] {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, month, sort] {
         const QByteArray body = reply->readAll();
         if (reply->error() != QNetworkReply::NoError) {
-            emit timelineBucketFailed(month, errorMessage(reply, body));
+            emit timelineBucketFailed(month, errorMessage(reply, body), sort);
             reply->deleteLater();
             return;
         }
         const QList<ImmichAsset> assets = assetsFromBucketBody(body);
         queueLibraryCache(assets);
-        emit timelineBucketLoaded(month, assets);
+        emit timelineBucketLoaded(month, assets, sort);
         reply->deleteLater();
     });
 }
@@ -851,8 +1054,16 @@ void ImmichClient::searchAssets(int page, int pageSize, bool pollOnly, const QSt
     } else {
         if (!pollOnly && !trimmedQuery.isEmpty() && !mode.isEmpty())
             body.insert(mode, trimmedQuery);
-        body.insert(QStringLiteral("order"), QStringLiteral("desc"));
+        // Callers may pick an order (see searchOrder); newest first otherwise.
+        if (!body.contains(QStringLiteral("order")) && !body.contains(QStringLiteral("orderBy")))
+            body.insert(QStringLiteral("order"), QStringLiteral("desc"));
         body.insert(QStringLiteral("withStacked"), true);
+    }
+    const bool filterShape = body.contains(QStringLiteral("orderBy"));
+    if (filterShape) {
+        body = toFilterShape(body);
+        if (page > 1)
+            body.insert(QStringLiteral("cursor"), m_searchCursors.value(QStringLiteral("library")));
     }
 
     const QString endpoint = smartSearch ? QStringLiteral("/search/smart")
@@ -863,7 +1074,7 @@ void ImmichClient::searchAssets(int page, int pageSize, bool pollOnly, const QSt
     searchRequest.setTransferTimeout(20000);
     auto *reply = m_network->post(searchRequest, QJsonDocument(body).toJson(QJsonDocument::Compact));
     connect(reply, &QNetworkReply::finished, this,
-            [this, reply, pollOnly, filteredSearch, trimmedQuery, page, generation] {
+            [this, reply, pollOnly, filteredSearch, trimmedQuery, page, generation, filterShape] {
         const QByteArray body = reply->readAll();
         if (!pollOnly && generation != m_searchGeneration) {
             reply->deleteLater();
@@ -889,7 +1100,12 @@ void ImmichClient::searchAssets(int page, int pageSize, bool pollOnly, const QSt
 
         setOnline(true);
         QString nextPage;
-        QList<ImmichAsset> assets = assetsFromSearchBody(body, &nextPage);
+        QString nextCursor;
+        QList<ImmichAsset> assets = assetsFromSearchBody(body, &nextPage, &nextCursor);
+        if (filterShape) {
+            m_searchCursors.insert(QStringLiteral("library"), nextCursor);
+            nextPage = nextCursor.isEmpty() ? QString() : QString::number(page + 1);
+        }
 
         if (pollOnly) {
             emit newestAssetsPolled(assets);
@@ -1072,49 +1288,512 @@ bool ImmichClient::emitCachedExplore()
     return true;
 }
 
-void ImmichClient::loadAssetsForPerson(const QString &personId, int page, int pageSize)
-{
-    searchFilteredAssets(QStringLiteral("person"), personId, page, pageSize);
-}
-
-void ImmichClient::loadAssetsForCity(const QString &city, int page, int pageSize)
-{
-    searchFilteredAssets(QStringLiteral("city"), city, page, pageSize);
-}
-
-void ImmichClient::loadAssetsForAlbum(const QString &albumId, int page, int pageSize)
-{
-    searchFilteredAssets(QStringLiteral("album"), albumId, page, pageSize);
-}
-
-void ImmichClient::loadAssetsForTag(const QString &tagId, int page, int pageSize)
-{
-    searchFilteredAssets(QStringLiteral("tag"), tagId, page, pageSize);
-}
-
-void ImmichClient::loadAssetsForFolder(const QString &path)
+void ImmichClient::loadAssetsForFolder(const QString &path, const AssetSort &sort)
 {
     QUrl url = apiUrl(QStringLiteral("/view/folder"));
     url.setQuery(QUrlQuery{{QStringLiteral("path"), path}});
-    fetchBrowseList(QStringLiteral("folder"), url, [this, path](const QByteArray &body) {
+    fetchBrowseList(QStringLiteral("folder"), url, [this, path, sort](const QByteArray &body) {
         QList<ImmichAsset> assets;
         for (const QJsonValue &value : QJsonDocument::fromJson(body).array()) {
             const ImmichAsset asset = assetFromObject(value.toObject());
             if (!asset.id.isEmpty())
                 assets.append(asset);
         }
-        std::sort(assets.begin(), assets.end(),
-                  [](const ImmichAsset &a, const ImmichAsset &b) { return a.takenAt > b.takenAt; });
-        emit filteredAssetsLoaded(QStringLiteral("folder"), path, assets, {});
+        // The folder arrives whole, with file details, so it's sorted here. After
+        // the viewed photos, "Last viewed" lists the rest newest first, like elsewhere.
+        sortFolderAssets(&assets, sort.field == AssetSort::Field::Viewed
+                                      ? AssetSort{AssetSort::Field::TakenAt, false}
+                                      : sort);
+        if (sort.field == AssetSort::Field::Viewed) {
+            // Viewed photos first in viewing order; the rest keep their date order.
+            QHash<QString, int> order;
+            const QList<ImmichAsset> history = recentlyViewed();
+            for (int i = 0; i < history.size(); ++i)
+                order.insert(history.at(i).id, i);
+            std::stable_sort(assets.begin(), assets.end(),
+                             [&order, &sort](const ImmichAsset &a, const ImmichAsset &b) {
+                                 const int first = order.value(a.id, -1);
+                                 const int second = order.value(b.id, -1);
+                                 if ((first < 0) != (second < 0))
+                                     return first >= 0;
+                                 if (first < 0)
+                                     return false;
+                                 return sort.ascending ? first > second : first < second;
+                             });
+        }
+        emit filteredAssetsLoaded(QStringLiteral("folder"), path, assets, {}, sort);
     });
 }
 
-void ImmichClient::loadCollectionAssets(const QString &kind, const QString &value, int page)
+QJsonObject ImmichClient::searchOrder(const AssetSort &sort)
 {
-    if (kind == QStringLiteral("folder"))
-        loadAssetsForFolder(value);
+    const QString direction = sort.ascending ? QStringLiteral("asc") : QStringLiteral("desc");
+    if (sort.field != AssetSort::Field::Size && sort.field != AssetSort::Field::Rating)
+        return {{QStringLiteral("order"), direction}};
+    const QString field = sort.field == AssetSort::Field::Size ? QStringLiteral("fileSizeInBytes")
+                                                               : QStringLiteral("rating");
+    return {{QStringLiteral("orderBy"),
+             QJsonObject{{QStringLiteral("field"), field}, {QStringLiteral("direction"), direction}}}};
+}
+
+bool ImmichClient::canSortByDateAdded(const QString &kind)
+{
+    static const QStringList kinds = {
+        QStringLiteral("person"),    QStringLiteral("album"),   QStringLiteral("tag"),
+        QStringLiteral("favorites"), QStringLiteral("archive"), QStringLiteral("trash"),
+        QStringLiteral("folder")};
+    return kinds.contains(kind);
+}
+
+void ImmichClient::loadCollectionAssets(const QString &kind, const QString &value, int page,
+                                        const AssetSort &sort)
+{
+    if (page <= 1)
+        ++m_collectionGeneration;
+    if (kind == QStringLiteral("viewed")) {
+        // Local history; queued so callers see the same async flow as a fetch.
+        QTimer::singleShot(0, this, [this, sort] {
+            emit filteredAssetsLoaded(QStringLiteral("viewed"), {}, recentlyViewed(), {}, sort);
+        });
+    } else if (kind == QStringLiteral("folder"))
+        loadAssetsForFolder(value, sort);
+    else if (sort.field == AssetSort::Field::AddedAt && canSortByDateAdded(kind))
+        loadCollectionTimeline(kind, value, page, sort);
+    else if (sort.field == AssetSort::Field::Activity && kind == QStringLiteral("album"))
+        loadAlbumByActivity(value, sort);
+    else if (sort.field == AssetSort::Field::Deleted && kind == QStringLiteral("trash"))
+        loadTrashByDeletion(sort);
+    else if (sort.field == AssetSort::Field::Viewed) {
+        const quint64 generation = m_collectionGeneration;
+        searchViewedFirst(collectionSearchFilter(kind, value), page, sort,
+                          [this, kind, value, sort, generation](const QList<ImmichAsset> &assets,
+                                                                const QString &nextPage) {
+                              if (generation == m_collectionGeneration)
+                                  emit filteredAssetsLoaded(kind, value, assets, nextPage, sort);
+                          });
+    }
     else
-        searchFilteredAssets(kind, value, page, 80);
+        searchFilteredAssets(kind, value, page, 80, sort);
+}
+
+// Fetches every page of a metadata search, for orders the server can't do.
+void ImmichClient::searchAllPages(const QJsonObject &filter,
+                                  std::function<void(const QList<ImmichAsset> &)> done)
+{
+    auto assets = std::make_shared<QList<ImmichAsset>>();
+    auto fetchPage = std::make_shared<std::function<void(int)>>();
+    const quint64 generation = m_collectionGeneration;
+    *fetchPage = [this, filter, done, assets, fetchPage, generation](int page) {
+        QJsonObject body = filter;
+        body.insert(QStringLiteral("page"), page);
+        body.insert(QStringLiteral("size"), 250);
+        body.insert(QStringLiteral("withExif"), true);
+        body.insert(QStringLiteral("withStacked"), true);
+        QNetworkRequest request = authenticatedRequest(apiUrl(QStringLiteral("/search/metadata")));
+        request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+        request.setRawHeader("Accept", "application/json");
+        auto *reply =
+            m_network->post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
+        connect(reply, &QNetworkReply::finished, this,
+                [this, reply, done, assets, fetchPage, generation, page] {
+                    const QByteArray body = reply->readAll();
+                    reply->deleteLater();
+                    if (generation != m_collectionGeneration)
+                        return;
+                    if (reply->error() != QNetworkReply::NoError) {
+                        emit requestFailed(tr("Load explore"), errorMessage(reply, body));
+                        *fetchPage = nullptr; // Break the self-reference.
+                        return;
+                    }
+                    QString nextPage;
+                    assets->append(assetsFromSearchBody(body, &nextPage));
+                    if (!nextPage.isEmpty()) {
+                        (*fetchPage)(page + 1);
+                        return;
+                    }
+                    done(*assets);
+                    *fetchPage = nullptr;
+                });
+    };
+    (*fetchPage)(1);
+}
+
+// Shared albums with likes and comments: the photos with the most recent
+// activity first, then the rest by date taken.
+void ImmichClient::loadAlbumByActivity(const QString &albumId, const AssetSort &sort)
+{
+    if (!ensureConfigured(tr("Load explore")))
+        return;
+    QUrl url = apiUrl(QStringLiteral("/activities"));
+    url.setQuery(QUrlQuery{{QStringLiteral("albumId"), albumId}});
+    QNetworkRequest request = authenticatedRequest(url);
+    request.setRawHeader("Accept", "application/json");
+    auto *reply = m_network->get(request);
+    const quint64 generation = m_collectionGeneration;
+    connect(reply, &QNetworkReply::finished, this, [this, reply, albumId, sort, generation] {
+        const QByteArray body = reply->readAll();
+        reply->deleteLater();
+        if (generation != m_collectionGeneration)
+            return;
+        if (reply->error() != QNetworkReply::NoError) {
+            const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            emit requestFailed(tr("Load explore"),
+                               status == 403
+                                   ? tr("Likes and comments need the activity.read permission.")
+                                   : errorMessage(reply, body));
+            return;
+        }
+        QHash<QString, QDateTime> latest;
+        for (const QJsonValue &value : QJsonDocument::fromJson(body).array()) {
+            const QJsonObject activity = value.toObject();
+            const QString assetId = activity.value(QStringLiteral("assetId")).toString();
+            const QDateTime when = QDateTime::fromString(
+                activity.value(QStringLiteral("createdAt")).toString(), Qt::ISODate);
+            if (!assetId.isEmpty() && when > latest.value(assetId))
+                latest.insert(assetId, when);
+        }
+        searchAllPages(collectionSearchFilter(QStringLiteral("album"), albumId),
+                       [this, albumId, sort, latest](const QList<ImmichAsset> &found) {
+                           QList<ImmichAsset> assets = found;
+                           std::stable_sort(assets.begin(), assets.end(),
+                                            [&latest, &sort](const ImmichAsset &a,
+                                                             const ImmichAsset &b) {
+                               const QDateTime first = latest.value(a.id);
+                               const QDateTime second = latest.value(b.id);
+                               if (first.isValid() != second.isValid())
+                                   return first.isValid();
+                               if (first.isValid() && first != second)
+                                   return sort.ascending ? first < second : first > second;
+                               return a.takenAt > b.takenAt;
+                           });
+                           emit filteredAssetsLoaded(QStringLiteral("album"), albumId, assets,
+                                                     {}, sort);
+                       });
+    });
+}
+
+// Assets don't expose when they were trashed, but trashing updates their
+// "updated" time, which is as good in practice.
+void ImmichClient::loadTrashByDeletion(const AssetSort &sort)
+{
+    if (!ensureConfigured(tr("Load explore")))
+        return;
+    searchAllPages(collectionSearchFilter(QStringLiteral("trash"), {}),
+                   [this, sort](const QList<ImmichAsset> &found) {
+                       QList<ImmichAsset> assets = found;
+                       std::stable_sort(assets.begin(), assets.end(),
+                                        [&sort](const ImmichAsset &a, const ImmichAsset &b) {
+                                            return sort.ascending ? a.updatedAt < b.updatedAt
+                                                                  : a.updatedAt > b.updatedAt;
+                                        });
+                       emit filteredAssetsLoaded(QStringLiteral("trash"), {}, assets, {}, sort);
+                   });
+}
+
+void ImmichClient::loadRandomAssets(const QString &kind, const QString &value)
+{
+    if (!ensureConfigured(tr("Load explore")))
+        return;
+    auto shuffled = [](QList<ImmichAsset> assets) {
+        std::shuffle(assets.begin(), assets.end(), *QRandomGenerator::global());
+        return assets;
+    };
+    if (kind == QStringLiteral("viewed")) {
+        QTimer::singleShot(0, this, [this, shuffled] {
+            emit randomAssetsLoaded(QStringLiteral("viewed"), {}, shuffled(recentlyViewed()), false);
+        });
+        return;
+    }
+    if (kind == QStringLiteral("folder")) {
+        QUrl url = apiUrl(QStringLiteral("/view/folder"));
+        url.setQuery(QUrlQuery{{QStringLiteral("path"), value}});
+        fetchBrowseList(QStringLiteral("folder"), url, [this, value, shuffled](const QByteArray &body) {
+            QList<ImmichAsset> assets;
+            for (const QJsonValue &item : QJsonDocument::fromJson(body).array()) {
+                const ImmichAsset asset = assetFromObject(item.toObject());
+                if (!asset.id.isEmpty())
+                    assets.append(asset);
+            }
+            emit randomAssetsLoaded(QStringLiteral("folder"), value, shuffled(assets), false);
+        });
+        return;
+    }
+
+    QJsonObject body = kind == QStringLiteral("library")
+                           ? QJsonObject{{QStringLiteral("visibility"), QStringLiteral("timeline")}}
+                           : collectionSearchFilter(kind, value);
+    if (body.isEmpty())
+        return;
+    body.insert(QStringLiteral("size"), 80);
+    body.insert(QStringLiteral("withExif"), true);
+    QNetworkRequest request = authenticatedRequest(apiUrl(QStringLiteral("/search/random")));
+    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+    request.setRawHeader("Accept", "application/json");
+    auto *reply = m_network->post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
+    connect(reply, &QNetworkReply::finished, this, [this, reply, kind, value] {
+        const QByteArray body = reply->readAll();
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) {
+            emit requestFailed(tr("Load explore"), errorMessage(reply, body));
+            return;
+        }
+        QList<ImmichAsset> assets;
+        for (const QJsonValue &item : QJsonDocument::fromJson(body).array()) {
+            const ImmichAsset asset = assetFromObject(item.toObject());
+            if (!asset.id.isEmpty())
+                assets.append(asset);
+        }
+        emit randomAssetsLoaded(kind, value, assets, !assets.isEmpty());
+    });
+}
+
+void ImmichClient::setRememberViewed(bool remember)
+{
+    TimelineSettings timeline = AppSettings().loadTimeline();
+    timeline.rememberViewed = remember;
+    AppSettings().saveTimeline(timeline);
+    m_rememberViewed = remember;
+    emit recentlyViewedChanged();
+}
+
+// Page 1 holds the viewed photos that are in this view, found with one search
+// (an OR of their ids, Immich 3.2+) and put in viewing order. Later pages are the
+// usual newest-first pages; callers skip photos they already show.
+void ImmichClient::searchViewedFirst(
+    const QJsonObject &flatFilter, int page, const AssetSort &sort,
+    std::function<void(const QList<ImmichAsset> &, const QString &)> done)
+{
+    if (!ensureConfigured(tr("Load explore")))
+        return;
+    const QList<ImmichAsset> history = recentlyViewed();
+    QJsonObject body;
+    if (page <= 1 && !history.isEmpty()) {
+        body = toFilterShape(flatFilter);
+        QJsonObject filter = body.value(QStringLiteral("filter")).toObject();
+        QJsonArray branches;
+        for (const ImmichAsset &asset : history)
+            branches.append(QJsonObject{{QStringLiteral("id"), QJsonObject{{QStringLiteral("eq"), asset.id}}}});
+        filter.insert(QStringLiteral("or"), branches);
+        body.insert(QStringLiteral("filter"), filter);
+        body.insert(QStringLiteral("size"), int(history.size()));
+        body.insert(QStringLiteral("withExif"), true);
+    } else {
+        // The rest, newest first; with no history page 1 starts here.
+        body = flatFilter;
+        body.insert(QStringLiteral("page"), history.isEmpty() ? page : page - 1);
+        body.insert(QStringLiteral("size"), 80);
+        body.insert(QStringLiteral("order"), QStringLiteral("desc"));
+        body.insert(QStringLiteral("withExif"), true);
+        body.insert(QStringLiteral("withStacked"), true);
+    }
+    const bool viewedPage = body.contains(QStringLiteral("filter"));
+    QNetworkRequest request = authenticatedRequest(apiUrl(QStringLiteral("/search/metadata")));
+    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+    request.setRawHeader("Accept", "application/json");
+    auto *reply = m_network->post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply, history, sort, viewedPage, done] {
+                const QByteArray body = reply->readAll();
+                reply->deleteLater();
+                if (reply->error() != QNetworkReply::NoError) {
+                    emit requestFailed(tr("Load explore"), errorMessage(reply, body));
+                    return;
+                }
+                QString nextPage;
+                QList<ImmichAsset> assets = assetsFromSearchBody(body, &nextPage);
+                if (viewedPage) {
+                    QHash<QString, int> order;
+                    for (int i = 0; i < history.size(); ++i)
+                        order.insert(history.at(i).id, i);
+                    std::sort(assets.begin(), assets.end(),
+                              [&order, &sort](const ImmichAsset &a, const ImmichAsset &b) {
+                                  const int first = order.value(a.id);
+                                  const int second = order.value(b.id);
+                                  return sort.ascending ? first > second : first < second;
+                              });
+                    done(assets, QStringLiteral("2"));
+                    return;
+                }
+                // Our page numbers run one ahead of the server's while page 1 is the history.
+                const int serverNext = nextPage.toInt();
+                done(assets, serverNext > 0 ? QString::number(history.isEmpty() ? serverNext
+                                                                                 : serverNext + 1)
+                                            : QString());
+            });
+}
+
+void ImmichClient::loadLibraryViewedFirst(int page, const AssetSort &sort)
+{
+    const quint64 generation = ++m_searchGeneration;
+    searchViewedFirst({{QStringLiteral("visibility"), QStringLiteral("timeline")}}, page, sort,
+                      [this, generation](const QList<ImmichAsset> &assets, const QString &nextPage) {
+                          if (generation == m_searchGeneration)
+                              emit assetsLoaded(assets, nextPage, {}, false);
+                      });
+}
+
+void ImmichClient::recordViewed(const ImmichAsset &asset)
+{
+    if (!isConfigured() || asset.id.isEmpty() || asset.isLocalPending() || !remembersViewed())
+        return;
+    constexpr int kMaxHistory = 300;
+    QList<ImmichAsset> history = m_offlineStore.loadViewHistory(m_connection.serverUrl);
+    history.removeIf([&asset](const ImmichAsset &seen) { return seen.id == asset.id; });
+    history.prepend(asset);
+    if (history.size() > kMaxHistory)
+        history.resize(kMaxHistory);
+    m_offlineStore.saveViewHistory(m_connection.serverUrl, history);
+
+    QHash<QString, AssetViewStats> stats = m_offlineStore.loadViewStats(m_connection.serverUrl);
+    AssetViewStats &entry = stats[asset.id];
+    entry.asset = asset;
+    entry.viewedAt.append(QDateTime::currentSecsSinceEpoch());
+    m_offlineStore.saveViewStats(m_connection.serverUrl, stats);
+    emit recentlyViewedChanged();
+}
+
+QList<ImmichAsset> ImmichClient::recentlyViewed() const
+{
+    return isConfigured() && remembersViewed()
+               ? m_offlineStore.loadViewHistory(m_connection.serverUrl)
+               : QList<ImmichAsset>{};
+}
+
+void ImmichClient::clearRecentlyViewed()
+{
+    m_offlineStore.saveViewHistory(m_connection.serverUrl, {});
+    m_offlineStore.saveViewStats(m_connection.serverUrl, {});
+    emit recentlyViewedChanged();
+}
+
+void ImmichClient::setAlbumOrder(const QString &albumId, bool ascending)
+{
+    if (!ensureConfigured(tr("Album order")) || !isValidImmichId(albumId))
+        return;
+    QNetworkRequest request =
+        authenticatedRequest(apiUrl(QStringLiteral("/albums/%1").arg(albumId)));
+    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+    request.setRawHeader("Accept", "application/json");
+    const QJsonObject body{
+        {QStringLiteral("order"), ascending ? QStringLiteral("asc") : QStringLiteral("desc")}};
+    auto *reply = m_network->sendCustomRequest(request, QByteArrayLiteral("PATCH"),
+                                               QJsonDocument(body).toJson(QJsonDocument::Compact));
+    connect(reply, &QNetworkReply::finished, this, [this, reply, albumId, ascending] {
+        const QByteArray body = reply->readAll();
+        reply->deleteLater();
+        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (status == 403)
+            emit albumOrderFailed(albumId,
+                                  tr("Saving the album's order in Immich needs the album.update "
+                                     "permission; it's kept in this app only."));
+        else if (reply->error() != QNetworkReply::NoError)
+            emit albumOrderFailed(albumId, errorMessage(reply, body));
+        else
+            emit albumOrderSaved(albumId, ascending);
+    });
+}
+
+// Search can't order by upload date, but the timeline can (Immich 3.0+), so a
+// date-added collection is fetched as timeline months. A "page" is a run of
+// months holding about 80 photos; page N starts at month N - 1.
+void ImmichClient::loadCollectionTimeline(const QString &kind, const QString &value, int page,
+                                          const AssetSort &sort)
+{
+    if (!ensureConfigured(tr("Load explore")))
+        return;
+    CollectionTimeline &timeline = m_collectionTimeline;
+    const bool sameCollection =
+        timeline.kind == kind && timeline.value == value && timeline.sort == sort;
+    if (page > 1 && sameCollection) {
+        loadCollectionTimelinePage(page - 1);
+        return;
+    }
+
+    timeline = {kind, value, sort, {}, timeline.generation + 1};
+    QUrl url = apiUrl(QStringLiteral("/timeline/buckets"));
+    QUrlQuery query = collectionTimelineQuery(kind, value);
+    query.addQueryItem(QStringLiteral("size"), QStringLiteral("MONTH"));
+    addSortQuery(&query, sort);
+    url.setQuery(query);
+    QNetworkRequest request = authenticatedRequest(url);
+    request.setRawHeader("Accept", "application/json");
+    auto *reply = m_network->get(request);
+    connect(reply, &QNetworkReply::finished, this,
+            [this, reply, generation = timeline.generation] {
+                const QByteArray body = reply->readAll();
+                reply->deleteLater();
+                if (generation != m_collectionTimeline.generation)
+                    return;
+                if (reply->error() != QNetworkReply::NoError) {
+                    emit requestFailed(tr("Load explore"), errorMessage(reply, body));
+                    return;
+                }
+                m_collectionTimeline.buckets = bucketsFromBody(body, m_collectionTimeline.sort);
+                loadCollectionTimelinePage(0);
+            });
+}
+
+void ImmichClient::loadCollectionTimelinePage(int firstBucket)
+{
+    const CollectionTimeline &timeline = m_collectionTimeline;
+    int lastBucket = firstBucket;
+    int count = 0;
+    while (lastBucket < timeline.buckets.size() && (count == 0 || count < 80))
+        count += timeline.buckets.at(lastBucket++).count;
+    if (firstBucket >= lastBucket) {
+        emit filteredAssetsLoaded(timeline.kind, timeline.value, {}, {}, timeline.sort);
+        return;
+    }
+
+    struct PageLoad {
+        QList<QList<ImmichAsset>> months;
+        int remaining = 0;
+        QString error;
+    };
+    auto load = std::make_shared<PageLoad>();
+    load->months.resize(lastBucket - firstBucket);
+    load->remaining = lastBucket - firstBucket;
+    const QString nextPage =
+        lastBucket < timeline.buckets.size() ? QString::number(lastBucket + 1) : QString();
+    const bool timelineOnly = timeline.kind != QStringLiteral("archive") &&
+                              timeline.kind != QStringLiteral("trash");
+
+    for (int i = firstBucket; i < lastBucket; ++i) {
+        const QDate month = timeline.buckets.at(i).month;
+        QUrl url = apiUrl(QStringLiteral("/timeline/bucket"));
+        QUrlQuery query = collectionTimelineQuery(timeline.kind, timeline.value);
+        query.addQueryItem(QStringLiteral("timeBucket"), month.toString(Qt::ISODate));
+        query.addQueryItem(QStringLiteral("size"), QStringLiteral("MONTH"));
+        addSortQuery(&query, timeline.sort);
+        url.setQuery(query);
+        QNetworkRequest request = authenticatedRequest(url);
+        request.setRawHeader("Accept", "application/json");
+        auto *reply = m_network->get(request);
+        connect(reply, &QNetworkReply::finished, this,
+                [this, reply, load, index = i - firstBucket, nextPage, timelineOnly,
+                 generation = timeline.generation] {
+                    const QByteArray body = reply->readAll();
+                    reply->deleteLater();
+                    if (generation != m_collectionTimeline.generation)
+                        return;
+                    if (reply->error() != QNetworkReply::NoError)
+                        load->error = errorMessage(reply, body);
+                    else
+                        load->months[index] = assetsFromBucketBody(body, timelineOnly);
+                    if (--load->remaining > 0)
+                        return;
+                    if (!load->error.isEmpty()) {
+                        emit requestFailed(tr("Load explore"), load->error);
+                        return;
+                    }
+                    QList<ImmichAsset> assets;
+                    for (const QList<ImmichAsset> &month : load->months)
+                        assets.append(month);
+                    emit filteredAssetsLoaded(m_collectionTimeline.kind,
+                                              m_collectionTimeline.value, assets, nextPage,
+                                              m_collectionTimeline.sort);
+                });
+    }
 }
 
 void ImmichClient::loadAlbums()
@@ -1123,13 +1802,7 @@ void ImmichClient::loadAlbums()
                     [this](const QByteArray &body) {
                         QList<ImmichAlbum> albums;
                         for (const QJsonValue &value : QJsonDocument::fromJson(body).array()) {
-                            const QJsonObject object = value.toObject();
-                            ImmichAlbum album;
-                            album.id = object.value(QStringLiteral("id")).toString();
-                            album.name = object.value(QStringLiteral("albumName")).toString();
-                            album.assetCount = object.value(QStringLiteral("assetCount")).toInt();
-                            album.thumbnailAssetId =
-                                object.value(QStringLiteral("albumThumbnailAssetId")).toString();
+                            const ImmichAlbum album = albumFromObject(value.toObject());
                             if (!album.id.isEmpty())
                                 albums.append(album);
                         }
@@ -1223,7 +1896,7 @@ void ImmichClient::fetchBrowseList(const QString &kind, const QUrl &url,
 }
 
 void ImmichClient::searchFilteredAssets(const QString &filterKind, const QString &filterValue,
-                                        int page, int pageSize)
+                                        int page, int pageSize, const AssetSort &sort)
 {
     // Favorites, archive and trash are whole-library views without a value.
     const bool needsValue = filterKind != QStringLiteral("favorites") &&
@@ -1232,31 +1905,21 @@ void ImmichClient::searchFilteredAssets(const QString &filterKind, const QString
     if (!ensureConfigured(tr("Load explore")) || (needsValue && filterValue.trimmed().isEmpty()))
         return;
 
-    QJsonObject body;
+    QJsonObject body = collectionSearchFilter(filterKind, filterValue);
+    if (body.isEmpty())
+        return;
     body.insert(QStringLiteral("page"), qMax(1, page));
     body.insert(QStringLiteral("size"), qBound(1, pageSize, 250));
-    body.insert(QStringLiteral("order"), QStringLiteral("desc"));
     body.insert(QStringLiteral("withExif"), true);
     body.insert(QStringLiteral("withStacked"), true);
-    if (filterKind == QStringLiteral("person")) {
-        QJsonArray personIds;
-        personIds.append(filterValue);
-        body.insert(QStringLiteral("personIds"), personIds);
-    } else if (filterKind == QStringLiteral("city")) {
-        body.insert(QStringLiteral("city"), filterValue);
-    } else if (filterKind == QStringLiteral("album")) {
-        body.insert(QStringLiteral("albumIds"), QJsonArray{filterValue});
-    } else if (filterKind == QStringLiteral("tag")) {
-        body.insert(QStringLiteral("tagIds"), QJsonArray{filterValue});
-    } else if (filterKind == QStringLiteral("favorites")) {
-        body.insert(QStringLiteral("isFavorite"), true);
-    } else if (filterKind == QStringLiteral("archive")) {
-        body.insert(QStringLiteral("visibility"), QStringLiteral("archive"));
-    } else if (filterKind == QStringLiteral("trash")) {
-        body.insert(QStringLiteral("withDeleted"), true);
-        body.insert(QStringLiteral("trashedAfter"), QStringLiteral("1970-01-01T00:00:00.000Z"));
-    } else {
-        return;
+    const QJsonObject order = searchOrder(sort);
+    for (auto it = order.begin(); it != order.end(); ++it)
+        body.insert(it.key(), it.value());
+    const bool filterShape = body.contains(QStringLiteral("orderBy"));
+    if (filterShape) {
+        body = toFilterShape(body);
+        if (page > 1)
+            body.insert(QStringLiteral("cursor"), m_searchCursors.value(QStringLiteral("collection")));
     }
 
     QNetworkRequest request = authenticatedRequest(apiUrl(QStringLiteral("/search/metadata")));
@@ -1264,7 +1927,7 @@ void ImmichClient::searchFilteredAssets(const QString &filterKind, const QString
     request.setRawHeader("Accept", "application/json");
     auto *reply = m_network->post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
     connect(reply, &QNetworkReply::finished, this,
-            [this, reply, filterKind, filterValue] {
+            [this, reply, filterKind, filterValue, sort, filterShape, page] {
                 const QByteArray body = reply->readAll();
                 if (reply->error() != QNetworkReply::NoError) {
                     emit requestFailed(tr("Load explore"), errorMessage(reply, body));
@@ -1272,8 +1935,13 @@ void ImmichClient::searchFilteredAssets(const QString &filterKind, const QString
                     return;
                 }
                 QString nextPage;
-                const QList<ImmichAsset> assets = assetsFromSearchBody(body, &nextPage);
-                emit filteredAssetsLoaded(filterKind, filterValue, assets, nextPage);
+                QString nextCursor;
+                const QList<ImmichAsset> assets = assetsFromSearchBody(body, &nextPage, &nextCursor);
+                if (filterShape) {
+                    m_searchCursors.insert(QStringLiteral("collection"), nextCursor);
+                    nextPage = nextCursor.isEmpty() ? QString() : QString::number(page + 1);
+                }
+                emit filteredAssetsLoaded(filterKind, filterValue, assets, nextPage, sort);
                 reply->deleteLater();
             });
 }
@@ -1983,13 +2651,7 @@ void ImmichClient::requestAssetDetails(const QString &assetId)
         if (albumsReply->error() == QNetworkReply::NoError) {
             QList<ImmichAlbum> albums;
             for (const QJsonValue &value : QJsonDocument::fromJson(body).array()) {
-                const QJsonObject object = value.toObject();
-                ImmichAlbum album;
-                album.id = object.value(QStringLiteral("id")).toString();
-                album.name = object.value(QStringLiteral("albumName")).toString();
-                album.assetCount = object.value(QStringLiteral("assetCount")).toInt();
-                album.thumbnailAssetId =
-                    object.value(QStringLiteral("albumThumbnailAssetId")).toString();
+                const ImmichAlbum album = albumFromObject(value.toObject());
                 if (!album.id.isEmpty())
                     albums.append(album);
             }
@@ -2176,6 +2838,15 @@ void ImmichClient::deleteAssets(const QStringList &assetIds, bool permanent)
         if (reply->error() != QNetworkReply::NoError) {
             emit requestFailed(tr("Delete"), errorMessage(reply, body));
         } else {
+            QList<ImmichAsset> history = m_offlineStore.loadViewHistory(m_connection.serverUrl);
+            if (history.removeIf([&ids](const ImmichAsset &seen) { return ids.contains(seen.id); })) {
+                m_offlineStore.saveViewHistory(m_connection.serverUrl, history);
+                emit recentlyViewedChanged();
+            }
+            QHash<QString, AssetViewStats> stats =
+                m_offlineStore.loadViewStats(m_connection.serverUrl);
+            if (stats.removeIf([&ids](const auto &entry) { return ids.contains(entry.key()); }))
+                m_offlineStore.saveViewStats(m_connection.serverUrl, stats);
             emit assetsDeleted(ids, permanent);
         }
         reply->deleteLater();

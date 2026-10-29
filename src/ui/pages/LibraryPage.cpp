@@ -9,6 +9,7 @@
 #include "ui/widgets/MediaViewerDialog.h"
 #include "ui/widgets/ScrollToTopButton.h"
 #include "ui/widgets/ShareLinkDialog.h"
+#include "ui/widgets/SortButton.h"
 #include "ui/widgets/SummaryTile.h"
 #include "ui/widgets/Toast.h"
 #include "ui/widgets/VideoHoverPreview.h"
@@ -115,6 +116,11 @@ LibraryPage::LibraryPage(ThemeManager *themeManager, ImmichClient *client,
     , m_uploadButton(new QPushButton(tr("Upload"), this))
     , m_refreshButton(new QPushButton(tr("Refresh"), this))
     , m_yearsButton(new QPushButton(tr("Years"), this))
+    , m_sortButton(new SortButton(this))
+    , m_shuffleButton(new QPushButton(this))
+    , m_sort(AppSettings().loadSort(QStringLiteral("library")))
+    , m_searchSort(AppSettings().loadSort(QStringLiteral("search"),
+                                          {AssetSort::Field::Relevance, false}))
     , m_layoutTimer(new QTimer(this))
     , m_visibilityTimer(new QTimer(this))
     , m_tileImages(new TileImageScheduler(client, [this] { scheduleVisibleMediaUpdate(); }, this))
@@ -201,7 +207,37 @@ LibraryPage::LibraryPage(ThemeManager *themeManager, ImmichClient *client,
     actionsLayout->addWidget(m_uploadButton);
     actionsLayout->addWidget(m_refreshButton);
     actionsLayout->addWidget(m_yearsButton);
+    actionsLayout->addWidget(m_sortButton);
+    configureActionButton(m_shuffleButton, QStringLiteral(":/icons/shuffle.svg"));
+    m_shuffleButton->setToolTip(tr("Shuffle (again for a new mix)"));
+    m_shuffleButton->setAccessibleName(tr("Shuffle"));
+    m_shuffleButton->setCursor(Qt::PointingHandCursor);
+    actionsLayout->addWidget(m_shuffleButton);
+    connect(m_shuffleButton, &QPushButton::clicked, this, &LibraryPage::shuffle);
+    connect(m_client, &ImmichClient::randomAssetsLoaded, this,
+            [this](const QString &kind, const QString &, const QList<ImmichAsset> &assets,
+                   bool more) { showRandomAssets(kind, assets, more); });
     actionsLayout->addWidget(m_zoomSlider);
+    updateSortButton();
+    connect(m_sortButton, &SortButton::sortChanged, this, &LibraryPage::chooseSort);
+    // Turning "Remember photos I open" off removes the Last viewed sort.
+    connect(m_client, &ImmichClient::recentlyViewedChanged, this, [this] {
+        const AssetSort before = m_sortButton->sort();
+        updateSortButton();
+        if (activeSort() != before && !m_searchActive) {
+            m_loading = false;
+            refresh();
+        }
+    });
+    connect(m_client, &ImmichClient::serverVersionChanged, this, [this] {
+        const AssetSort before = m_sortButton->sort();
+        updateSortButton();
+        // A remembered size or rating sort becomes available once the version is known.
+        if (activeSort() != before) {
+            m_loading = false;
+            m_searchActive ? requestPage(1, false) : refresh();
+        }
+    });
     toolbarLayout->addWidget(actions);
     connect(m_zoomSlider, &ZoomSlider::valueChanged, this, &LibraryPage::setTileSize);
     connect(m_zoomSlider, &ZoomSlider::stepRequested, this,
@@ -686,6 +722,10 @@ void LibraryPage::refresh()
 {
     if (m_loading)
         return;
+    if (m_shuffled) {
+        shuffle();
+        return;
+    }
 
     if (m_searchActive) {
         requestPage(1, false);
@@ -700,6 +740,13 @@ void LibraryPage::refresh()
     m_flushedBucketCount = 0;
     m_pendingScrollToDate = QDate();
 
+    if (listSortActive()) {
+        clearTimeline();
+        syncPendingLocalAssets();
+        requestPage(1, false);
+        return;
+    }
+
     if (!m_client->isOnline()) {
         // Falls back to the flat cached snapshot via the existing page path.
         requestPage(1, false);
@@ -713,13 +760,14 @@ void LibraryPage::refresh()
     m_refreshButton->setEnabled(false);
     m_status->setText(tr("Loading library…"));
     // Keep the previous offline snapshot until a successful reload replaces it.
-    m_client->loadTimelineBuckets();
+    m_client->loadTimelineBuckets(m_sort);
 }
 
 bool LibraryPage::hasMoreToLoad() const
 {
-    // The library publishes a complete index; only search is paginated.
-    return m_searchActive && !m_nextPage.isEmpty();
+    // The timeline publishes a complete index; search, size/rating lists and
+    // shuffled batches are paged.
+    return (m_searchActive || listSortActive() || m_shuffled) && !m_nextPage.isEmpty();
 }
 
 void LibraryPage::loadMore()
@@ -727,14 +775,17 @@ void LibraryPage::loadMore()
     if (m_loading)
         return;
 
-    if (m_searchActive) {
+    if (m_shuffled && !m_nextPage.isEmpty()) {
+        m_loading = true;
+        m_client->loadRandomAssets(QStringLiteral("library"), {});
+        return;
+    }
+    if (m_searchActive || listSortActive()) {
         bool ok = false;
         const int page = m_nextPage.toInt(&ok);
         if (ok && page > 0)
             requestPage(page, true);
-        return;
     }
-
 }
 
 void LibraryPage::maybeLoadMore()
@@ -757,7 +808,7 @@ void LibraryPage::kickTimelineBucketFetches()
         const QDate month = m_monthBuckets.at(m_nextBucketToRequest).month;
         ++m_nextBucketToRequest;
         m_inflightBuckets.insert(month, m_timelineEpoch);
-        m_client->loadTimelineBucket(month);
+        m_client->loadTimelineBucket(month, m_sort);
     }
 }
 
@@ -844,8 +895,9 @@ void LibraryPage::finishTimelineBucket(const QDate &month, const QList<ImmichAss
 
 void LibraryPage::checkForNewPhotos()
 {
+    // A paged size/rating list never holds everything, so it can't spot new photos.
     if (!isVisible() || m_loading || m_autoRefreshPending || !m_client->isConfigured() ||
-        m_searchActive)
+        m_searchActive || listSortActive() || m_shuffled)
         return;
     m_client->pollNewestAssets(24);
 }
@@ -865,6 +917,10 @@ void LibraryPage::applySearch()
     QJsonObject filters = options;
     filters.remove(QStringLiteral("mode"));
     m_searchActive = !query.isEmpty() || !filters.isEmpty();
+    // Immich can't shuffle search results, so search leaves the shuffled view.
+    m_shuffled = false;
+    m_shuffleButton->setVisible(!m_searchActive);
+    updateSortButton();
     m_contentStack->setCurrentIndex(0);
     m_nextPage.clear();
     updateAutoCheckTimer();
@@ -948,6 +1004,27 @@ void LibraryPage::scrollCurrent(bool toTop)
 
 void LibraryPage::showDay(const QDate &day)
 {
+    // Day links are dates taken, so the timeline switches to that order for them.
+    const bool wasShuffled = std::exchange(m_shuffled, false);
+    const bool resort = m_sort.field != AssetSort::Field::TakenAt;
+    if (wasShuffled && !resort && !m_searchActive) {
+        updateSortButton();
+        m_pendingDay = day;
+        m_loading = false;
+        refresh();
+        return;
+    }
+    if (resort) {
+        m_sort = {AssetSort::Field::TakenAt, m_sort.ascending};
+        AppSettings().saveSort(QStringLiteral("library"), m_sort);
+        updateSortButton();
+        if (!m_searchActive) {
+            m_pendingDay = day;
+            m_loading = false;
+            refresh();
+            return;
+        }
+    }
     if (m_searchActive || m_monthBuckets.isEmpty()) {
         // Jump once the timeline's month list has (re)loaded.
         m_pendingDay = day;
@@ -1068,11 +1145,31 @@ void LibraryPage::requestPage(int page, bool append)
                                      : tr("Loading your library…"));
         }
     }
-    m_client->loadAssets(page, 80, m_searchQuery, m_searchActive ? m_searchOptions : QJsonObject{});
+    if (!m_searchActive && activeSort().field == AssetSort::Field::Viewed) {
+        m_client->loadLibraryViewedFirst(page, activeSort());
+        return;
+    }
+    QJsonObject options = m_searchActive ? m_searchOptions : QJsonObject{};
+    // Smart search only returns relevance order; dates are grouped here instead.
+    if (listSortActive())
+        options.insert(QStringLiteral("visibility"), QStringLiteral("timeline"));
+    if ((m_searchActive && !smartSearchActive()) || listSortActive()) {
+        const QJsonObject order = ImmichClient::searchOrder(activeSort());
+        for (auto it = order.begin(); it != order.end(); ++it)
+            options.insert(it.key(), it.value());
+    }
+    m_client->loadAssets(page, 80, m_searchQuery, options);
 }
 
 LibraryPage::DaySection *LibraryPage::sectionForDate(const QDate &date)
 {
+    // Shuffled, and orders without dates (relevance, size, rating), use one
+    // plain section.
+    if (m_shuffled || !activeSort().groupsByDay()) {
+        if (m_sections.isEmpty())
+            m_sections.append(DaySection{});
+        return &m_sections.first();
+    }
     for (DaySection &section : m_sections) {
         if (section.date == date)
             return &section;
@@ -1084,18 +1181,167 @@ LibraryPage::DaySection *LibraryPage::sectionForDate(const QDate &date)
     section.header->setObjectName(QStringLiteral("timelineDayHeader"));
     section.header->setProperty("section", true);
 
-    // Newest days first so local pending tiles stay above older Immich months.
+    // Days follow the sort (newest first by default); unknown dates go last.
     int insertAt = m_sections.size();
     for (int i = 0; i < m_sections.size(); ++i) {
         if (!date.isValid())
             break;
-        if (!m_sections.at(i).date.isValid() || date > m_sections.at(i).date) {
+        const QDate other = m_sections.at(i).date;
+        if (!other.isValid() || (activeSort().ascending ? date < other : date > other)) {
             insertAt = i;
             break;
         }
     }
     m_sections.insert(insertAt, section);
     return &m_sections[insertAt];
+}
+
+QDate LibraryPage::sectionDate(const ImmichAsset &asset) const
+{
+    if (activeSort().field == AssetSort::Field::AddedAt && asset.addedAt.isValid())
+        return asset.addedAt.toLocalTime().date();
+    return asset.takenAt.isValid() ? asset.takenAt.date() : QDate();
+}
+
+QList<AssetSort::Field> LibraryPage::sortFields() const
+{
+    using Field = AssetSort::Field;
+    const bool sizeAndRating = m_client->serverAtLeast(3, 2);
+    QList<Field> fields;
+    if (m_searchActive) {
+        // Smart search ranks by relevance and can't order by anything else.
+        if (smartSearchActive())
+            return {Field::Relevance, Field::TakenAt};
+        fields = {Field::TakenAt};
+    } else {
+        fields = {Field::TakenAt, Field::AddedAt};
+    }
+    if (sizeAndRating)
+        fields << Field::Size << Field::Rating;
+    // Finding the viewed photos in a view needs 3.2's search filters.
+    if (!m_searchActive && sizeAndRating && m_client->remembersViewed())
+        fields << Field::Viewed;
+    return fields;
+}
+
+AssetSort LibraryPage::activeSort() const
+{
+    const QList<AssetSort::Field> fields = sortFields();
+    const AssetSort sort = m_searchActive ? m_searchSort : m_sort;
+    return fields.contains(sort.field) ? sort : AssetSort{fields.first(), false};
+}
+
+bool LibraryPage::smartSearchActive() const
+{
+    return m_searchActive && !m_searchQuery.isEmpty() &&
+           m_searchOptions.value(QStringLiteral("mode")).toString().isEmpty();
+}
+
+bool LibraryPage::listSortActive() const
+{
+    return !m_searchActive && !activeSort().groupsByDay();
+}
+
+void LibraryPage::updateSortButton()
+{
+    m_sortButton->setFields(sortFields());
+    m_sortButton->setSort(activeSort());
+    m_sortButton->setShuffled(m_shuffled);
+}
+
+void LibraryPage::chooseSort(const AssetSort &sort)
+{
+    if (m_shuffled) {
+        m_shuffled = false;
+        if (sort == m_sort) {
+            updateSortButton();
+            m_loading = false;
+            refresh();
+            return;
+        }
+    }
+    if (!m_searchActive) {
+        setSort(sort);
+        return;
+    }
+    if (sort == m_searchSort)
+        return;
+    m_searchSort = sort;
+    AppSettings().saveSort(QStringLiteral("search"), sort);
+    m_loading = false;
+    m_nextPage.clear();
+    requestPage(1, false);
+}
+
+void LibraryPage::setSort(const AssetSort &sort)
+{
+    if (sort == m_sort)
+        return;
+    m_sort = sort;
+    AppSettings().saveSort(QStringLiteral("library"), sort);
+    updateSortButton();
+    if (m_searchActive)
+        return;
+    // Restart even mid-load; results for the old sort are ignored.
+    m_loading = false;
+    refresh();
+}
+
+void LibraryPage::shuffle()
+{
+    if (m_searchActive || !m_client->isConfigured())
+        return;
+    m_shuffled = true;
+    updateSortButton();
+    m_monthBuckets.clear();
+    m_readyBucketAssets.clear();
+    m_inflightBuckets.clear();
+    ++m_timelineEpoch;
+    m_nextBucketToRequest = 0;
+    m_flushedBucketCount = 0;
+    m_pendingScrollToDate = QDate();
+    m_contentStack->setCurrentIndex(0);
+    clearTimeline();
+    m_nextPage.clear();
+    m_loading = true;
+    m_refreshButton->setEnabled(false);
+    m_status->setText(tr("Shuffling…"));
+    m_client->loadRandomAssets(QStringLiteral("library"), {});
+}
+
+void LibraryPage::showRandomAssets(const QString &kind, const QList<ImmichAsset> &assets,
+                                   bool more)
+{
+    if (kind != QStringLiteral("library") || !m_shuffled)
+        return;
+    // Random batches can repeat photos already shown.
+    QList<ImmichAsset> fresh;
+    for (const ImmichAsset &asset : assets) {
+        if (!m_tilesById.contains(asset.id))
+            fresh.append(asset);
+    }
+    appendAssetsToTimeline(fresh);
+    m_nextPage = more && !fresh.isEmpty() ? QStringLiteral("more") : QString();
+    m_loading = false;
+    m_refreshButton->setEnabled(true);
+    m_status->setText(tr("%n item(s), shuffled", nullptr, m_assets.size()));
+    scheduleLayout();
+    updateEmptyState();
+}
+
+void LibraryPage::showRecentlyAdded()
+{
+    const AssetSort recent{AssetSort::Field::AddedAt, false};
+    if (std::exchange(m_shuffled, false) && m_sort == recent && !m_searchActive) {
+        updateSortButton();
+        m_loading = false;
+        refresh();
+    }
+    setSort(recent);
+    if (m_searchActive) {
+        m_searchField->clear();
+        resetSearchFilters();
+    }
 }
 
 QString LibraryPage::formatDayHeader(const QDate &date) const
@@ -1151,8 +1397,7 @@ void LibraryPage::appendAssetsToTimeline(const QList<ImmichAsset> &assets)
             continue;
 
         m_assets.append(asset);
-        const QDate date = asset.takenAt.isValid() ? asset.takenAt.date() : QDate();
-        DaySection *section = sectionForDate(date);
+        DaySection *section = sectionForDate(sectionDate(asset));
         auto *tile = new MediaTile(asset, m_timelineHost);
         if (!asset.isLocalPending())
             tile->setHoverPreview(m_videoHoverPreview);
@@ -1193,8 +1438,7 @@ void LibraryPage::prependLocalAsset(const ImmichAsset &asset)
     }
 
     m_assets.prepend(asset);
-    const QDate date = asset.takenAt.isValid() ? asset.takenAt.date() : QDate();
-    DaySection *section = sectionForDate(date);
+    DaySection *section = sectionForDate(sectionDate(asset));
     auto *tile = new MediaTile(asset, m_timelineHost);
     section->tiles.prepend(tile);
     m_tilesById.insert(asset.id, tile);
@@ -1282,9 +1526,10 @@ void LibraryPage::syncPendingLocalAssets()
     updateEmptyState();
 }
 
-void LibraryPage::handleTimelineBucketsLoaded(const QList<TimeBucketInfo> &buckets)
+void LibraryPage::handleTimelineBucketsLoaded(const QList<TimeBucketInfo> &buckets,
+                                              const AssetSort &sort)
 {
-    if (m_searchActive)
+    if (m_searchActive || sort != m_sort)
         return;
 
     m_monthBuckets = buckets;
@@ -1326,8 +1571,11 @@ void LibraryPage::handleTimelineBucketsLoaded(const QList<TimeBucketInfo> &bucke
 }
 
 void LibraryPage::handleTimelineBucketLoaded(const QDate &month,
-                                             const QList<ImmichAsset> &assets)
+                                             const QList<ImmichAsset> &assets,
+                                             const AssetSort &sort)
 {
+    if (sort != m_sort)
+        return;
     if (m_pendingYearCoverRequests.contains(month)) {
         const int year = m_pendingYearCoverRequests.take(month);
         handleYearCoverLoaded(year, assets);
@@ -1346,8 +1594,11 @@ void LibraryPage::handleTimelineBucketLoaded(const QDate &month,
     kickTimelineBucketFetches();
 }
 
-void LibraryPage::handleTimelineBucketFailed(const QDate &month, const QString &message)
+void LibraryPage::handleTimelineBucketFailed(const QDate &month, const QString &message,
+                                             const AssetSort &sort)
 {
+    if (sort != m_sort)
+        return;
     m_pendingYearCoverRequests.remove(month);
     if (m_pendingYearDetailRequests.contains(month)) {
         const int year = m_pendingYearDetailRequests.take(month);
@@ -1380,8 +1631,8 @@ QList<LibraryPage::YearSummary> LibraryPage::computeYearSummaries() const
         const int year = bucket.month.year();
         auto it = byYear.find(year);
         if (it == byYear.end()) {
-            // m_monthBuckets is ordered newest-first, so the first bucket seen
-            // for a year is already its most recent month.
+            // Buckets follow the sort, so the first one seen for a year is the
+            // month a sorted grid would start that year with.
             byYear.insert(year, {year, bucket.count, bucket.month});
         } else {
             it->count += bucket.count;
@@ -1389,7 +1640,9 @@ QList<LibraryPage::YearSummary> LibraryPage::computeYearSummaries() const
     }
     QList<YearSummary> years = byYear.values();
     std::sort(years.begin(), years.end(),
-             [](const YearSummary &a, const YearSummary &b) { return a.year > b.year; });
+              [ascending = m_sort.ascending](const YearSummary &a, const YearSummary &b) {
+                  return ascending ? a.year < b.year : a.year > b.year;
+              });
     return years;
 }
 
@@ -1410,7 +1663,7 @@ void LibraryPage::showYearGrid()
 
     if (m_monthBuckets.isEmpty()) {
         m_status->setText(tr("Loading…"));
-        m_client->loadTimelineBuckets();
+        m_client->loadTimelineBuckets(m_sort);
         return;
     }
     buildYearGrid();
@@ -1419,7 +1672,9 @@ void LibraryPage::showYearGrid()
 void LibraryPage::backToLibrary()
 {
     m_contentStack->setCurrentIndex(0);
-    if (!m_searchActive && m_flushedBucketCount < m_monthBuckets.size()) {
+    // Years loads the month list; only the timeline itself should stream it in.
+    if (!m_searchActive && !m_shuffled && !listSortActive() &&
+        m_flushedBucketCount < m_monthBuckets.size()) {
         m_loading = true;
         m_refreshButton->setEnabled(false);
         updateTimelineLoadingStatus();
@@ -1465,7 +1720,7 @@ void LibraryPage::buildYearGrid()
 
         if (summary.coverMonth.isValid()) {
             m_pendingYearCoverRequests.insert(summary.coverMonth, summary.year);
-            m_client->loadTimelineBucket(summary.coverMonth);
+            m_client->loadTimelineBucket(summary.coverMonth, m_sort);
         }
     }
     layoutYearGrid();
@@ -1522,7 +1777,7 @@ void LibraryPage::handleYearTileClicked(int year)
             continue;
         ++m_yearDetailExpectedMonths;
         m_pendingYearDetailRequests.insert(bucket.month, year);
-        m_client->loadTimelineBucket(bucket.month);
+        m_client->loadTimelineBucket(bucket.month, m_sort);
     }
     m_yearDetailStatus->setText(tr("%1 - loading…").arg(year));
 }
@@ -1573,10 +1828,12 @@ void LibraryPage::buildYearDetailUi()
     m_yearDetailStatus->setText(QString::number(m_openYearDetail));
 
     const QLocale locale;
-    // Most recent month first, matching the rest of the app's newest-first
-    // convention.
+    // Months and days follow the sort, like the timeline.
     QList<QDate> months = m_yearDetailAssetsByMonth.keys();
-    std::sort(months.begin(), months.end(), std::greater<QDate>());
+    const auto byOrder = [ascending = m_sort.ascending](const QDate &a, const QDate &b) {
+        return ascending ? a < b : a > b;
+    };
+    std::sort(months.begin(), months.end(), byOrder);
 
     for (const QDate &month : months) {
         const QList<ImmichAsset> &assets = m_yearDetailAssetsByMonth.value(month);
@@ -1585,7 +1842,7 @@ void LibraryPage::buildYearDetailUi()
 
         QMap<QDate, QList<ImmichAsset>> byDay;
         for (const ImmichAsset &asset : assets) {
-            const QDate day = asset.takenAt.isValid() ? asset.takenAt.date() : QDate();
+            const QDate day = sectionDate(asset);
             if (day.isValid())
                 byDay[day].append(asset);
         }
@@ -1599,7 +1856,7 @@ void LibraryPage::buildYearDetailUi()
         m_yearDetailWidgets.append(header);
 
         QList<QDate> days = byDay.keys();
-        std::sort(days.begin(), days.end(), std::greater<QDate>());
+        std::sort(days.begin(), days.end(), byOrder);
         for (const QDate &day : days) {
             const QList<ImmichAsset> &dayAssets = byDay.value(day);
             auto *tile = new SummaryTile(QString::number(day.day()), dayAssets.size(),
@@ -1655,6 +1912,20 @@ void LibraryPage::layoutYearDetail()
 
 void LibraryPage::jumpToDate(const QDate &day)
 {
+    // From Years: a shuffled or size/rating list has no days, so go to the timeline.
+    if (m_shuffled || listSortActive()) {
+        m_pendingDay = day;
+        m_shuffled = false;
+        if (listSortActive()) {
+            setSort({AssetSort::Field::TakenAt, m_sort.ascending});
+        } else {
+            updateSortButton();
+            m_loading = false;
+            refresh();
+        }
+        m_contentStack->setCurrentIndex(0);
+        return;
+    }
     m_contentStack->setCurrentIndex(0);
     if (!day.isValid() || m_monthBuckets.isEmpty())
         return;

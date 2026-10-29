@@ -10,6 +10,7 @@
 #include "ui/widgets/MediaViewerDialog.h"
 #include "ui/widgets/ScrollToTopButton.h"
 #include "ui/widgets/ShareLinkDialog.h"
+#include "ui/widgets/SortButton.h"
 #include "ui/widgets/Toast.h"
 #include "ui/widgets/VideoHoverPreview.h"
 #include "ui/widgets/ZoomSlider.h"
@@ -211,8 +212,13 @@ ExplorePage::ExplorePage(ThemeManager *themeManager, ImmichClient *client, QWidg
     m_browseLayout->setSpacing(18);
 
     auto createSection = [this](SectionRow *section, const QString &title, int rowHeight) {
-        section->header = new QLabel(title, m_browseContent);
-        section->header->setProperty("section", true);
+        section->header = new QWidget(m_browseContent);
+        auto *headerLayout = new QHBoxLayout(section->header);
+        headerLayout->setContentsMargins(0, 0, 0, 0);
+        auto *label = new QLabel(title, section->header);
+        label->setProperty("section", true);
+        headerLayout->addWidget(label);
+        headerLayout->addStretch();
         section->header->hide();
 
         section->scroll = new QScrollArea(m_browseContent);
@@ -237,6 +243,33 @@ ExplorePage::ExplorePage(ThemeManager *themeManager, ImmichClient *client, QWidg
     createSection(&m_peopleSection, tr("People"), 168);
     createSection(&m_placesSection, tr("Places"), 168);
     createSection(&m_recentSection, tr("Recently added"), 168);
+    auto *viewAllRecent = new QPushButton(tr("View all"), m_recentSection.header);
+    viewAllRecent->setProperty("linkButton", true);
+    viewAllRecent->setCursor(Qt::PointingHandCursor);
+    viewAllRecent->setToolTip(tr("Show the whole library, newest uploads first"));
+    m_recentSection.header->layout()->addWidget(viewAllRecent);
+    connect(viewAllRecent, &QPushButton::clicked, this, &ExplorePage::recentlyAddedRequested);
+    createSection(&m_viewedSection, tr("Recently viewed"), 168);
+    auto *viewAllViewed = new QPushButton(tr("View all"), m_viewedSection.header);
+    viewAllViewed->setProperty("linkButton", true);
+    viewAllViewed->setCursor(Qt::PointingHandCursor);
+    viewAllViewed->setToolTip(tr("Photos you opened lately, on this computer"));
+    m_viewedSection.header->layout()->addWidget(viewAllViewed);
+    connect(viewAllViewed, &QPushButton::clicked, this, &ExplorePage::showRecentlyViewed);
+    connect(m_client, &ImmichClient::recentlyViewedChanged, this, [this] {
+        if (m_loadedOnce)
+            populateViewedRow();
+        if (m_collectionFilterKind == QStringLiteral("viewed") && m_client->recentlyViewed().isEmpty())
+            reloadCollection(); // Cleared from Settings.
+        // Turning "Remember photos I open" off removes the Last viewed sort.
+        if (m_collectionFilterKind.isEmpty() || m_collectionFilterKind == QStringLiteral("viewed"))
+            return;
+        const AssetSort before = m_collectionSortButton->sort();
+        m_collectionSortButton->setFields(collectionSortFields());
+        m_collectionSortButton->setSort(effectiveCollectionSort());
+        if (effectiveCollectionSort() != before)
+            reloadCollection();
+    });
     m_browseLayout->addStretch();
     m_browseScroll->setWidget(m_browseContent);
 
@@ -310,6 +343,36 @@ ExplorePage::ExplorePage(ThemeManager *themeManager, ImmichClient *client, QWidg
             QMessageBox::Yes)
             m_client->emptyTrash();
     });
+    m_collectionSortButton = new SortButton(collectionToolbar);
+    connect(m_collectionSortButton, &SortButton::sortChanged, this,
+            &ExplorePage::chooseCollectionSort);
+    connect(m_client, &ImmichClient::serverVersionChanged, this, [this] {
+        if (m_collectionFilterKind.isEmpty())
+            return;
+        const AssetSort before = m_collectionSortButton->sort();
+        m_collectionSortButton->setFields(collectionSortFields());
+        m_collectionSortButton->setSort(effectiveCollectionSort());
+        if (effectiveCollectionSort() != before)
+            reloadCollection();
+    });
+    connect(m_client, &ImmichClient::albumOrderFailed, this,
+            [this](const QString &, const QString &message) { Toast::showMessage(this, message); });
+    connect(m_client, &ImmichClient::albumOrderSaved, this, [](const QString &albumId, bool) {
+        // Immich has it now; following Immich keeps web UI changes in sync.
+        const QString key = QStringLiteral("album:") + albumId;
+        if (AppSettings().loadSort(key).field == AssetSort::Field::TakenAt)
+            AppSettings().clearSort(key);
+    });
+    collectionToolbarLayout->addWidget(m_collectionSortButton);
+    m_collectionShuffleButton = new QPushButton(collectionToolbar);
+    configureActionButton(m_collectionShuffleButton, QStringLiteral(":/icons/shuffle.svg"));
+    m_collectionShuffleButton->setToolTip(tr("Shuffle (again for a new mix)"));
+    m_collectionShuffleButton->setAccessibleName(tr("Shuffle"));
+    m_collectionShuffleButton->setCursor(Qt::PointingHandCursor);
+    collectionToolbarLayout->addWidget(m_collectionShuffleButton);
+    connect(m_collectionShuffleButton, &QPushButton::clicked, this,
+            &ExplorePage::shuffleCollection);
+    connect(m_client, &ImmichClient::randomAssetsLoaded, this, &ExplorePage::showRandomAssets);
     collectionToolbarLayout->addWidget(m_collectionZoomSlider);
     connect(m_collectionZoomSlider, &ZoomSlider::valueChanged, this,
             &ExplorePage::setCollectionTileSize);
@@ -719,6 +782,7 @@ void ExplorePage::clearSections()
         section->scroll->hide();
     };
     clearRow(&m_peopleSection);
+    clearRow(&m_viewedSection);
     clearRow(&m_placesSection);
     clearRow(&m_recentSection);
     m_personCards.clear();
@@ -780,7 +844,7 @@ void ExplorePage::showExplore(const ImmichExploreData &data, bool fromCache)
         connect(card, &ExploreCard::activated, this, [this, id = asset.id] {
             for (const ImmichAsset &recent : m_recentAssets) {
                 if (recent.id == id) {
-                    openAsset(recent, false);
+                    openAsset(recent, AssetSource::RecentlyAdded);
                     return;
                 }
             }
@@ -788,6 +852,7 @@ void ExplorePage::showExplore(const ImmichExploreData &data, bool fromCache)
         m_client->loadThumbnail(asset.id);
     }
     populateSection(&m_recentSection, !data.recentAssets.isEmpty());
+    populateViewedRow();
 
     m_browseStatus->setText(
         fromCache
@@ -919,7 +984,8 @@ void ExplorePage::openPerson(const ImmichPerson &person)
     setChips({}, {});
     // Force a fresh face fetch so the hero updates even if a prior request is in flight.
     m_client->loadPersonThumbnail(person.id);
-    m_client->loadAssetsForPerson(person.id);
+    m_client->loadCollectionAssets(QStringLiteral("person"), person.id, 1,
+                                   effectiveCollectionSort());
     emit sectionShown(BrowseSection::People, person.id, title);
 }
 
@@ -944,12 +1010,19 @@ void ExplorePage::openPlace(const ImmichPlace &place)
     m_collectionHeroAssetId = place.sampleAsset.id;
     if (!place.sampleAsset.id.isEmpty())
         m_client->loadThumbnail(place.sampleAsset.id);
-    m_client->loadAssetsForCity(place.city);
+    m_client->loadCollectionAssets(QStringLiteral("city"), place.city, 1,
+                                   effectiveCollectionSort());
     emit overviewShown();
 }
 
 void ExplorePage::showAlbum(const ImmichAlbum &album)
 {
+    // The sidebar's copy may predate an order change made here.
+    m_collectionAlbum = album;
+    for (const ImmichAlbum &known : std::as_const(m_albums)) {
+        if (known.id == album.id)
+            m_collectionAlbum = known;
+    }
     openCollection(QStringLiteral("album"), album.id, album.name, BrowseSection::Albums);
     setCrumbs({{tr("Albums"), [this] { showIndex(BrowseSection::Albums); }}}, album.name);
     setChips({}, {});
@@ -1054,7 +1127,7 @@ void ExplorePage::openCollection(const QString &kind, const QString &value,
     m_pendingCollectionTitle = title;
     m_pendingPersonStyle = false;
     showCollectionPage(title, tr("Loading photos…"), kind, value, {}, false);
-    m_client->loadCollectionAssets(kind, value);
+    m_client->loadCollectionAssets(kind, value, 1, effectiveCollectionSort());
     emit sectionShown(section, value, title);
 }
 
@@ -1227,6 +1300,10 @@ void ExplorePage::showCollectionPage(const QString &title, const QString &subtit
 {
     m_collectionFilterKind = filterKind;
     m_collectionFilterValue = filterValue;
+    if (filterKind != QStringLiteral("album") || m_collectionAlbum.id != filterValue)
+        m_collectionAlbum = {};
+    m_collectionShuffled = false;
+    loadCollectionSort();
     m_collectionHeroAssetId.clear();
     m_collectionPersonStyle = personStyle;
     m_collectionNextPage.clear();
@@ -1246,6 +1323,8 @@ void ExplorePage::showCollectionPage(const QString &title, const QString &subtit
     const bool trash = filterKind == QStringLiteral("trash");
     m_restoreAllButton->setVisible(trash);
     m_emptyTrashButton->setVisible(trash);
+    m_collectionSortButton->setVisible(filterKind != QStringLiteral("viewed"));
+    m_collectionShuffleButton->setVisible(!trash);
     setPage(Page::Collection);
 }
 
@@ -1334,6 +1413,12 @@ void ExplorePage::clearCollectionTimeline()
 
 ExplorePage::DaySection *ExplorePage::sectionForDate(const QDate &date)
 {
+    // Shuffled, and orders without dates (size, rating, activity), use one plain section.
+    if (m_collectionShuffled || !effectiveCollectionSort().groupsByDay()) {
+        if (m_collectionSections.isEmpty())
+            m_collectionSections.append(DaySection{});
+        return &m_collectionSections.first();
+    }
     for (DaySection &section : m_collectionSections) {
         if (section.date == date)
             return &section;
@@ -1362,8 +1447,14 @@ QString ExplorePage::formatDayHeader(const QDate &date) const
 }
 
 void ExplorePage::showFilteredAssets(const QString &filterKind, const QString &filterValue,
-                                     const QList<ImmichAsset> &assets, const QString &nextPage)
+                                     const QList<ImmichAsset> &assets, const QString &nextPage,
+                                     const AssetSort &sort)
 {
+    // A reply for this collection under a sort that has since changed, or from
+    // before it was shuffled.
+    if (filterKind == m_collectionFilterKind && filterValue == m_collectionFilterValue &&
+        (sort != effectiveCollectionSort() || m_collectionShuffled))
+        return;
     const bool append =
         m_collectionLoadingMore && m_collectionFilterKind == filterKind &&
         m_collectionFilterValue == filterValue &&
@@ -1409,16 +1500,24 @@ void ExplorePage::appendCollectionAssets(const QList<ImmichAsset> &assets)
         if (m_collectionTiles.contains(asset.id))
             continue;
 
-        const QDate date = asset.takenAt.isValid() ? asset.takenAt.date() : QDate();
+        // Results arrive in sort order, so days only need the matching date.
+        const AssetSort::Field field = effectiveCollectionSort().field;
+        QDate date = asset.takenAt.isValid() ? asset.takenAt.date() : QDate();
+        if (field == AssetSort::Field::AddedAt && asset.addedAt.isValid())
+            date = asset.addedAt.toLocalTime().date();
+        else if (field == AssetSort::Field::Deleted && asset.updatedAt.isValid())
+            date = asset.updatedAt.toLocalTime().date();
+        else if (field == AssetSort::Field::Modified && asset.modifiedAt.isValid())
+            date = asset.modifiedAt.toLocalTime().date();
         DaySection *section = sectionForDate(date);
         auto *tile = new MediaTile(asset, m_collectionHost);
         tile->setHoverPreview(m_collectionHoverPreview);
         section->tiles.append(tile);
         m_collectionTiles.insert(asset.id, tile);
         connect(tile, &MediaTile::activated, this,
-                [this](const ImmichAsset &asset) { openAsset(asset, true); });
+                [this](const ImmichAsset &asset) { openAsset(asset, AssetSource::Collection); });
         connect(tile, &MediaTile::infoRequested, this, [this](const ImmichAsset &asset) {
-            openAsset(asset, true)->setInfoPanelVisible(true);
+            openAsset(asset, AssetSource::Collection)->setInfoPanelVisible(true);
         });
         connect(tile, &MediaTile::favoriteRequested, this,
                 [this](const ImmichAsset &asset, bool favorite) {
@@ -1614,7 +1713,147 @@ void ExplorePage::requestCollectionNextPage()
     m_collectionLoadMore->setVisible(true);
     setActionButtonLabel(m_collectionLoadMore, tr("Loading…"));
 
-    m_client->loadCollectionAssets(m_collectionFilterKind, m_collectionFilterValue, page);
+    // Shuffled, each batch is a fresh random pick rather than a page.
+    if (m_collectionShuffled) {
+        m_client->loadRandomAssets(m_collectionFilterKind, m_collectionFilterValue);
+        return;
+    }
+    m_client->loadCollectionAssets(m_collectionFilterKind, m_collectionFilterValue, page,
+                                   effectiveCollectionSort());
+}
+
+AssetSort ExplorePage::effectiveCollectionSort() const
+{
+    const QList<AssetSort::Field> fields = collectionSortFields();
+    return fields.contains(m_collectionSort.field) ? m_collectionSort
+                                                    : AssetSort{fields.first(), false};
+}
+
+QList<AssetSort::Field> ExplorePage::collectionSortFields() const
+{
+    using Field = AssetSort::Field;
+    const QString &kind = m_collectionFilterKind;
+    if (kind == QStringLiteral("viewed"))
+        return {Field::Viewed};
+    const bool viewed = m_client->remembersViewed();
+    // Folders arrive whole with file details, so they sort like a file manager.
+    if (kind == QStringLiteral("folder")) {
+        QList<Field> fields{Field::Name, Field::TakenAt, Field::AddedAt, Field::Modified,
+                            Field::Size, Field::Rating,  Field::Type};
+        if (viewed)
+            fields << Field::Viewed;
+        return fields;
+    }
+    QList<Field> fields;
+    if (kind == QStringLiteral("trash"))
+        fields << Field::Deleted;
+    fields << Field::TakenAt;
+    if (ImmichClient::canSortByDateAdded(kind))
+        fields << Field::AddedAt;
+    // Size and rating come from search, which folders don't use.
+    if (kind != QStringLiteral("folder") && m_client->serverAtLeast(3, 2))
+        fields << Field::Size << Field::Rating;
+    if (kind == QStringLiteral("album") && m_collectionAlbum.activityEnabled)
+        fields << Field::Activity;
+    // Finding the viewed photos in a collection needs 3.2's search filters.
+    if (viewed && m_client->serverAtLeast(3, 2))
+        fields << Field::Viewed;
+    return fields;
+}
+
+QString ExplorePage::collectionSortKey() const
+{
+    return m_collectionFilterValue.isEmpty()
+               ? m_collectionFilterKind
+               : m_collectionFilterKind + u':' + m_collectionFilterValue;
+}
+
+// Each collection remembers its own sort. An album's date-taken order lives in
+// Immich (shared with the web UI); it's only kept here when saving it failed.
+void ExplorePage::loadCollectionSort()
+{
+    AssetSort fallback;
+    if (m_collectionFilterKind == QStringLiteral("trash"))
+        fallback = {AssetSort::Field::Deleted, false};
+    else if (m_collectionFilterKind == QStringLiteral("folder"))
+        fallback = {AssetSort::Field::Name, true};
+    else if (!m_collectionAlbum.id.isEmpty())
+        fallback = {AssetSort::Field::TakenAt, m_collectionAlbum.orderAscending};
+    m_collectionSort = AppSettings().loadSort(collectionSortKey(), fallback);
+    m_collectionSortButton->setFields(collectionSortFields());
+    m_collectionSortButton->setSort(effectiveCollectionSort());
+    m_collectionSortButton->setShuffled(false);
+}
+
+void ExplorePage::chooseCollectionSort(const AssetSort &sort)
+{
+    m_collectionShuffled = false;
+    m_collectionSort = sort;
+    AppSettings().saveSort(collectionSortKey(), sort);
+    if (!m_collectionAlbum.id.isEmpty() && sort.field == AssetSort::Field::TakenAt &&
+        sort.ascending != m_collectionAlbum.orderAscending) {
+        m_collectionAlbum.orderAscending = sort.ascending;
+        for (ImmichAlbum &album : m_albums) {
+            if (album.id == m_collectionAlbum.id)
+                album.orderAscending = sort.ascending;
+        }
+        m_client->setAlbumOrder(m_collectionAlbum.id, sort.ascending);
+    }
+    reloadCollection();
+}
+
+void ExplorePage::shuffleCollection()
+{
+    if (m_collectionFilterKind.isEmpty())
+        return;
+    m_collectionShuffled = true;
+    m_collectionSortButton->setShuffled(true);
+    m_collectionLoadingMore = false;
+    m_collectionLoadFailed = false;
+    m_collectionNextPage.clear();
+    clearCollectionTimeline();
+    updateCollectionLoadMore({});
+    m_collectionSubtitle->setText(tr("Shuffling…"));
+    m_client->loadRandomAssets(m_collectionFilterKind, m_collectionFilterValue);
+}
+
+void ExplorePage::showRandomAssets(const QString &kind, const QString &value,
+                                   const QList<ImmichAsset> &assets, bool more)
+{
+    if (!m_collectionShuffled || kind != m_collectionFilterKind ||
+        value != m_collectionFilterValue)
+        return;
+    // Random batches can repeat photos already shown.
+    QList<ImmichAsset> fresh;
+    for (const ImmichAsset &asset : assets) {
+        if (!m_collectionTiles.contains(asset.id))
+            fresh.append(asset);
+    }
+    m_collectionLoadingMore = false;
+    appendCollectionAssets(fresh);
+    if (m_collectionTiles.isEmpty())
+        m_collectionSubtitle->setText(tr("Nothing here yet"));
+    else
+        updateCollectionSubtitle();
+    // Any page number works: each shuffled batch is a fresh random pick.
+    updateCollectionLoadMore(more && !fresh.isEmpty() ? QStringLiteral("1") : QString());
+    scheduleCollectionLayout();
+    scheduleCollectionVisibility();
+}
+
+void ExplorePage::reloadCollection()
+{
+    if (m_collectionFilterKind.isEmpty() ||
+        m_stack->currentIndex() != static_cast<int>(Page::Collection))
+        return;
+    m_collectionLoadingMore = false;
+    m_collectionLoadFailed = false;
+    m_collectionNextPage.clear();
+    clearCollectionTimeline();
+    updateCollectionLoadMore({});
+    m_collectionSubtitle->setText(tr("Loading photos…"));
+    m_client->loadCollectionAssets(m_collectionFilterKind, m_collectionFilterValue, 1,
+                                   effectiveCollectionSort());
 }
 
 void ExplorePage::backToBrowse()
@@ -1630,15 +1869,64 @@ void ExplorePage::backToBrowse()
     emit overviewShown();
 }
 
-MediaViewerDialog *ExplorePage::openAsset(const ImmichAsset &asset, bool fromCollection)
+void ExplorePage::populateViewedRow()
+{
+    constexpr int kRowLength = 30;
+    auto *layout = qobject_cast<QHBoxLayout *>(m_viewedSection.host->layout());
+    while (layout->count() > 1) {
+        QLayoutItem *item = layout->takeAt(0);
+        if (auto *card = qobject_cast<ExploreCard *>(item->widget())) {
+            for (auto it = m_browseAssetCards.begin(); it != m_browseAssetCards.end();) {
+                it = it.value() == card ? m_browseAssetCards.erase(it) : std::next(it);
+            }
+            card->deleteLater();
+        }
+        delete item;
+    }
+    m_viewedSection.cards.clear();
+    m_viewedAssets = m_client->recentlyViewed().mid(0, kRowLength);
+    for (const ImmichAsset &asset : std::as_const(m_viewedAssets)) {
+        auto *card = new ExploreCard(ExploreCard::Style::Media, m_viewedSection.host);
+        card->setPixmap({});
+        layout->insertWidget(layout->count() - 1, card);
+        m_viewedSection.cards.append(card);
+        m_browseAssetCards.insert(asset.id, card);
+        connect(card, &ExploreCard::activated, this,
+                [this, asset] { openAsset(asset, AssetSource::RecentlyViewed); });
+        m_client->loadThumbnail(asset.id);
+    }
+    populateSection(&m_viewedSection, !m_viewedAssets.isEmpty());
+}
+
+void ExplorePage::showRecentlyViewed()
+{
+    const QString title = tr("Recently viewed");
+    m_pendingCollectionTitle = title;
+    m_pendingPersonStyle = false;
+    showCollectionPage(title, tr("Loading photos…"), QStringLiteral("viewed"), {}, {}, false);
+    setCrumbs({{tr("Explore"), [this] { showOverview(); }}}, title);
+    setChips({}, {});
+    m_client->loadCollectionAssets(QStringLiteral("viewed"), {}, 1, effectiveCollectionSort());
+    emit overviewShown();
+}
+
+MediaViewerDialog *ExplorePage::openAsset(const ImmichAsset &asset, AssetSource source)
 {
     if (asset.isVideo() && m_collectionHoverPreview)
         m_collectionHoverPreview->stop();
 
     auto *viewer = new MediaViewerDialog(
         m_themeManager, m_client, asset,
-        [this, fromCollection](const QString &assetId, int step) {
-            return adjacentAsset(fromCollection, assetId, step);
+        // Viewing reorders the history, so step through it as it was when opened.
+        [this, source, viewed = m_viewedAssets](const QString &assetId, int step) {
+            if (source == AssetSource::RecentlyViewed) {
+                for (qsizetype i = 0; i < viewed.size(); ++i) {
+                    if (viewed.at(i).id == assetId)
+                        return viewed.value(i + step);
+                }
+                return ImmichAsset{};
+            }
+            return adjacentAsset(source, assetId, step);
         },
         this);
     connect(viewer, &MediaViewerDialog::copyRequested, this, &ExplorePage::copyRequested);
@@ -1652,7 +1940,7 @@ MediaViewerDialog *ExplorePage::openAsset(const ImmichAsset &asset, bool fromCol
     connect(viewer, &MediaViewerDialog::albumRequested, this, &ExplorePage::albumRequested);
     connect(viewer, &MediaViewerDialog::tagRequested, this, &ExplorePage::tagRequested);
     connect(viewer, &MediaViewerDialog::folderRequested, this, &ExplorePage::folderRequested);
-    if (fromCollection && m_collectionFilterKind == QStringLiteral("trash")) {
+    if (source == AssetSource::Collection && m_collectionFilterKind == QStringLiteral("trash")) {
         viewer->setTrashMode(true);
         connect(viewer, &MediaViewerDialog::restoreRequested, this,
                 [this](const ImmichAsset &asset) { m_client->restoreFromTrash({asset.id}); });
@@ -1661,8 +1949,9 @@ MediaViewerDialog *ExplorePage::openAsset(const ImmichAsset &asset, bool fromCol
     return viewer;
 }
 
-ImmichAsset ExplorePage::adjacentAsset(bool fromCollection, const QString &assetId, int step)
+ImmichAsset ExplorePage::adjacentAsset(AssetSource source, const QString &assetId, int step)
 {
+    const bool fromCollection = source == AssetSource::Collection;
     QList<ImmichAsset> assets;
     if (fromCollection) {
         for (const DaySection &section : m_collectionSections) {
