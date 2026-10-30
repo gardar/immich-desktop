@@ -594,37 +594,84 @@ bool UpdateManager::assetMatches(const QString &name, InstallKind kind) const
 bool UpdateManager::launchInstaller(const QString &packagePath, InstallKind kind)
 {
 #ifdef Q_OS_WIN
-    const QString appPath = QCoreApplication::applicationFilePath();
+    // cmd "start /wait setup.exe /S" returns as soon as the NSIS UAC stub exits, so the
+    // old immich.exe was being relaunched while the elevated installer still ran — the
+    // file stayed locked and the update never stuck. PowerShell -Verb RunAs -Wait waits
+    // for the real elevated process; we then start the installed binary, not whatever
+    // path we happened to be running from (e.g. a local build folder).
+    const QString appPath = QDir::toNativeSeparators(QCoreApplication::applicationFilePath());
+    const QString installerPath = QDir::toNativeSeparators(packagePath);
     const QString helperPath = QStandardPaths::writableLocation(QStandardPaths::TempLocation) +
-                               QStringLiteral("/immich-desktop-apply-update.cmd");
+                               QStringLiteral("/immich-desktop-apply-update.ps1");
     QFile helper(helperPath);
     if (!helper.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text))
         return false;
 
-    QString script;
-    if (kind == InstallKind::WindowsMsi) {
-        script = QStringLiteral(
-                     "@echo off\r\n"
-                     "timeout /t 2 /nobreak >nul\r\n"
-                     "msiexec /i \"%1\" /passive\r\n"
-                     "if exist \"%2\" start \"\" \"%2\"\r\n")
-                     .arg(QDir::toNativeSeparators(packagePath),
-                          QDir::toNativeSeparators(appPath));
-    } else {
-        script = QStringLiteral(
-                     "@echo off\r\n"
-                     "timeout /t 2 /nobreak >nul\r\n"
-                     "start /wait \"\" \"%1\" /S\r\n"
-                     "if errorlevel 1 start /wait \"\" \"%1\"\r\n"
-                     "if exist \"%2\" start \"\" \"%2\"\r\n")
-                     .arg(QDir::toNativeSeparators(packagePath),
-                          QDir::toNativeSeparators(appPath));
-    }
-    helper.write(script.toLocal8Bit());
+    const qint64 pid = QCoreApplication::applicationPid();
+    const QString isMsi = kind == InstallKind::WindowsMsi ? QStringLiteral("$true")
+                                                          : QStringLiteral("$false");
+    // Single-quoted PowerShell literals: escape embedded single quotes by doubling.
+    auto psQuote = [](QString value) {
+        return QStringLiteral("'%1'").arg(value.replace(QLatin1Char('\''), QStringLiteral("''")));
+    };
+
+    const QString script = QStringLiteral(
+                               "$ErrorActionPreference = 'Continue'\n"
+                               "$installer = %1\n"
+                               "$fallback = %2\n"
+                               "$appPid = %3\n"
+                               "$isMsi = %4\n"
+                               "if ($appPid -gt 0) {\n"
+                               "  try { Wait-Process -Id $appPid -Timeout 90 -ErrorAction Stop } catch {}\n"
+                               "}\n"
+                               "Start-Sleep -Seconds 1\n"
+                               "Get-Process -Name immich -ErrorAction SilentlyContinue |\n"
+                               "  Stop-Process -Force -ErrorAction SilentlyContinue\n"
+                               "Start-Sleep -Seconds 1\n"
+                               "function Install-Package {\n"
+                               "  if ($isMsi) {\n"
+                               "    $args = @('/i', $installer, '/passive', '/norestart')\n"
+                               "    try {\n"
+                               "      return (Start-Process -FilePath msiexec.exe -ArgumentList $args "
+                               "-Verb RunAs -PassThru -Wait).ExitCode\n"
+                               "    } catch {\n"
+                               "      return (Start-Process -FilePath msiexec.exe -ArgumentList $args "
+                               "-PassThru -Wait).ExitCode\n"
+                               "    }\n"
+                               "  }\n"
+                               "  try {\n"
+                               "    $code = (Start-Process -FilePath $installer -ArgumentList '/S' "
+                               "-Verb RunAs -PassThru -Wait).ExitCode\n"
+                               "    if ($code -ne 0) {\n"
+                               "      $code = (Start-Process -FilePath $installer -Verb RunAs "
+                               "-PassThru -Wait).ExitCode\n"
+                               "    }\n"
+                               "    return $code\n"
+                               "  } catch {\n"
+                               "    return (Start-Process -FilePath $installer -PassThru -Wait).ExitCode\n"
+                               "  }\n"
+                               "}\n"
+                               "Install-Package | Out-Null\n"
+                               "$candidates = @(\n"
+                               "  \"$env:ProgramFiles\\immich desktop\\bin\\immich.exe\",\n"
+                               "  \"${env:ProgramFiles(x86)}\\immich desktop\\bin\\immich.exe\",\n"
+                               "  $fallback\n"
+                               ")\n"
+                               "foreach ($path in $candidates) {\n"
+                               "  if ($path -and (Test-Path -LiteralPath $path)) {\n"
+                               "    Start-Process -FilePath $path\n"
+                               "    break\n"
+                               "  }\n"
+                               "}\n")
+                               .arg(psQuote(installerPath), psQuote(appPath),
+                                    QString::number(pid), isMsi);
+    helper.write(script.toUtf8());
     helper.close();
 
-    return QProcess::startDetached(QStringLiteral("cmd.exe"),
-                                   {QStringLiteral("/C"), helperPath});
+    return QProcess::startDetached(
+        QStringLiteral("powershell.exe"),
+        {QStringLiteral("-NoProfile"), QStringLiteral("-ExecutionPolicy"),
+         QStringLiteral("Bypass"), QStringLiteral("-File"), helperPath});
 #else
     if (kind == InstallKind::LinuxSnap) {
         const QString snapName =
@@ -670,10 +717,29 @@ bool UpdateManager::launchInstaller(const QString &packagePath, InstallKind kind
     }
 
     if (kind == InstallKind::LinuxDeb) {
-        if (QProcess::startDetached(QStringLiteral("pkexec"),
-                                    {QStringLiteral("dpkg"), QStringLiteral("-i"), packagePath})) {
+        // Install, then start the packaged binary (not a random local build path).
+        const QString helperPath = QStandardPaths::writableLocation(QStandardPaths::TempLocation) +
+                                   QStringLiteral("/immich-desktop-apply-update.sh");
+        QFile helper(helperPath);
+        if (!helper.open(QIODevice::WriteOnly | QIODevice::Truncate | QIODevice::Text))
+            return false;
+        const QString exeName = QFileInfo(QCoreApplication::applicationFilePath()).fileName();
+        const QString script = QStringLiteral(
+                                   "#!/bin/sh\n"
+                                   "set -eu\n"
+                                   "sleep 1\n"
+                                   "pkexec dpkg -i \"%1\" || dpkg -i \"%1\"\n"
+                                   "for candidate in \"/usr/bin/%2\" \"/usr/local/bin/%2\"; do\n"
+                                   "  if [ -x \"$candidate\" ]; then exec \"$candidate\"; fi\n"
+                                   "done\n")
+                                   .arg(packagePath, exeName);
+        helper.write(script.toUtf8());
+        helper.close();
+        QFile::setPermissions(helperPath,
+                              QFile::permissions(helperPath) | QFile::ExeUser | QFile::ExeGroup |
+                                  QFile::ExeOther);
+        if (QProcess::startDetached(QStringLiteral("/bin/sh"), {helperPath}))
             return true;
-        }
         return QDesktopServices::openUrl(QUrl::fromLocalFile(packagePath));
     }
 
