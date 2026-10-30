@@ -73,7 +73,7 @@ yay -S immich-desktop   # or any other AUR helper
 ### Other packages
 
 Grab Windows (`.exe` / `.msi`), Linux `.deb`, or AppImage (`x86_64` / `aarch64`)
-from the [latest release](https://github.com/hdmain/immich-desktop/releases/latest) (currently **v0.2.3**).
+from the [latest release](https://github.com/hdmain/immich-desktop/releases/latest) (currently **v0.2.4**).
 Snap Store ships `amd64` and `arm64`.
 
 ## How to run
@@ -203,7 +203,7 @@ Options for distribution packages:
 | --- | --- | --- |
 | `IMMICH_ENABLE_UPDATER` | `ON` | Built-in update checks and installs; turn off when a package manager handles updates |
 | `IMMICH_EXECUTABLE_NAME` | `immich` | Name of the installed executable (the `.desktop` file follows it) |
-| `IMMICH_BUILD_INFO` | empty | Shown after the version, e.g. `AUR` or `beta 1a2b3c4` → "v0.2.3 (AUR)" |
+| `IMMICH_BUILD_INFO` | empty | Shown after the version, e.g. `AUR` or `beta 1a2b3c4` → "v0.2.4 (AUR)" |
 
 ## Project layout
 
