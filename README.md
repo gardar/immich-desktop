@@ -246,6 +246,18 @@ Switch accounts using the profile menu in the top bar, or manage them under **Se
 
 Each profile keeps its own server/local URLs, API key, HTTP headers, client certificate settings, library and image caches, upload queue, download directory, playback/timeline preferences, and folder sync settings/state. Switching stops the previous account's requests and folder watching; its queued uploads resume when you return. Appearance, language, window behavior, and app updates are shared. Existing settings and caches migrate into a **Personal** profile. Deleting a profile removes its saved connection settings; cached files are never assigned to a new profile.
 
+## Star History
+
+<p align="center">
+  <a href="https://www.star-history.com/#hdmain/immich-desktop&Date">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=hdmain/immich-desktop&type=date&theme=dark&legend=top-left" />
+      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=hdmain/immich-desktop&type=date&legend=top-left" />
+      <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=hdmain/immich-desktop&type=date&legend=top-left" width="720" />
+    </picture>
+  </a>
+</p>
+
 ## License
 
 MIT - see [LICENSE.txt](LICENSE.txt).
